@@ -1,5 +1,7 @@
 package com.medicine.SwasthyaSetu.controller;
 import com.medicine.SwasthyaSetu.Entity.Patient;
+import com.medicine.SwasthyaSetu.dto.PatientRegisterRequest;
+import com.medicine.SwasthyaSetu.dto.PatientResponse;
 import com.medicine.SwasthyaSetu.service.PatientService;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,8 +16,8 @@ public class PatientController {
     }
 
     @PostMapping("/register")
-    public Patient registerPatient(@RequestBody Patient patient){
-        return patientService.registerPatient(patient);
+    public PatientResponse registerPatient(@RequestBody PatientRegisterRequest request){
+        return patientService.registerPatient(request);
     }
 
 
