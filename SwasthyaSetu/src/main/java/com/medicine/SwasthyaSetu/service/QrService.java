@@ -1,0 +1,66 @@
+package com.medicine.SwasthyaSetu.service;
+
+import com.medicine.SwasthyaSetu.Entity.MedicalRecord;
+import com.medicine.SwasthyaSetu.Entity.QRToken;
+import com.medicine.SwasthyaSetu.dto.QrScanRequest;
+import com.medicine.SwasthyaSetu.dto.QrScanResponse;
+import com.medicine.SwasthyaSetu.repository.MedicalRecordRepository;
+import com.medicine.SwasthyaSetu.repository.QrTokenRepository;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class QrService {
+
+    private final QrTokenRepository qrTokenRepository;
+    private final MedicalRecordRepository medicalRecordRepository;
+
+    public QrService(QrTokenRepository qrTokenRepository, MedicalRecordRepository medicalRecordRepository){
+        this.qrTokenRepository = qrTokenRepository;
+        this.medicalRecordRepository = medicalRecordRepository;
+    }
+
+    public QrScanResponse scan(QrScanRequest request){
+
+        // Find token
+        QRToken qr = qrTokenRepository.findByToken(request.getToken()).orElseThrow(
+                () -> new RuntimeException("Invalid QR"));
+
+        // Check time validity
+        LocalDateTime currTime = LocalDateTime.now();
+        if(currTime.isBefore(qr.getValidFrom()) || currTime.isAfter(qr.getValidTo())){
+            throw new RuntimeException("QR Code Expired");
+        }
+
+        // Check already used
+        if(qr.isUsed()){
+            throw new RuntimeException("QR already used");
+        }
+
+        // Fetch medical records
+
+        List<MedicalRecord> records = medicalRecordRepository.findByPatientId(qr.getPatient().getId());
+
+        // convert to simple list
+        List<String> data = records.stream()
+                .map(r -> r.getDiagnosis() + " | " + r.getPrescription())
+                .collect(Collectors.toList());
+
+        // Mark QR as used
+        qr.setUsed(true);
+        qrTokenRepository.save(qr);
+
+        // Response
+
+        QrScanResponse response = new QrScanResponse();
+        response.setStatus("SUCCESS");
+        response.setMessage("Access Granted");
+        response.setRecords(data);
+
+        return response;
+
+    }
+}
