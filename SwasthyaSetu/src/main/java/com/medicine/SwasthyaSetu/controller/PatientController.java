@@ -1,5 +1,6 @@
 package com.medicine.SwasthyaSetu.controller;
-import com.medicine.SwasthyaSetu.Entity.Patient;
+import com.medicine.SwasthyaSetu.dto.PatientDetailsRequest;
+import com.medicine.SwasthyaSetu.dto.PatientDetailsResponse;
 import com.medicine.SwasthyaSetu.dto.PatientRegisterRequest;
 import com.medicine.SwasthyaSetu.dto.PatientResponse;
 import com.medicine.SwasthyaSetu.service.PatientService;
@@ -20,5 +21,11 @@ public class PatientController {
         return patientService.registerPatient(request);
     }
 
+    @GetMapping("/history/{phone}")
+    public PatientDetailsResponse getPatientDetails(@PathVariable("phone") String phone){
+        PatientDetailsRequest patientDetailsRequest = new PatientDetailsRequest();
+        patientDetailsRequest.setPhone(phone);
+        return patientService.getPatientDetails(patientDetailsRequest);
+    }
 
 }

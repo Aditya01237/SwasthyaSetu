@@ -24,22 +24,23 @@ public class AuthService {
     // Send Otp
     public String sendOtp(SendOtpRequest request){
 
-        Patient patient = patientRepository.findByUhid(request.getUhid()).orElseThrow(
-                ()-> new RuntimeException("Patient Not Found")
-        );
+        Patient patient = patientRepository.findByUhid(request.getUhid())
+                .orElseThrow(() -> new RuntimeException("Patient Not Found"));
 
         String phone = patient.getPhone();
 
         int otp = 100000 + new Random().nextInt(900000);
 
-        OtpVerification otpEntity = new OtpVerification();
-        otpEntity.setPhone(patient.getPhone());
+        // CHECK existing OTP
+        OtpVerification otpEntity = otpVerificationRepository.findByPhone(phone)
+                .orElse(new OtpVerification());
+
+        // UPDATE fields
+        otpEntity.setPhone(phone);
         otpEntity.setOtp(String.valueOf(otp));
         otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otpEntity.setVerified(false);
-
         otpVerificationRepository.save(otpEntity);
-
         System.out.println("OTP : " + otp);
 
         return "OTP sent successfully";
