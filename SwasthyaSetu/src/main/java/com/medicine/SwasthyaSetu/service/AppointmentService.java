@@ -1,15 +1,9 @@
 package com.medicine.SwasthyaSetu.service;
 
-import com.medicine.SwasthyaSetu.Entity.Appointment;
-import com.medicine.SwasthyaSetu.Entity.Hospital;
-import com.medicine.SwasthyaSetu.Entity.Patient;
-import com.medicine.SwasthyaSetu.Entity.QRToken;
+import com.medicine.SwasthyaSetu.Entity.*;
 import com.medicine.SwasthyaSetu.dto.AppointmentRequest;
 import com.medicine.SwasthyaSetu.dto.AppointmentResponse;
-import com.medicine.SwasthyaSetu.repository.AppointmentRepository;
-import com.medicine.SwasthyaSetu.repository.HospitalRepository;
-import com.medicine.SwasthyaSetu.repository.PatientRepository;
-import com.medicine.SwasthyaSetu.repository.QrTokenRepository;
+import com.medicine.SwasthyaSetu.repository.*;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,15 +15,19 @@ public class AppointmentService {
     private final HospitalRepository hospitalRepository;
     private final AppointmentRepository appointmentRepository;
     private final QrTokenRepository qrTokenRepository;
+    private final DoctorRepository doctorRepository;
 
     public AppointmentService(PatientRepository patientRepository,
                               HospitalRepository hospitalRepository,
                               AppointmentRepository appointmentRepository,
-                              QrTokenRepository qrTokenRepository){
+                              QrTokenRepository qrTokenRepository,
+                              DoctorRepository doctorRepository
+    ){
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
         this.appointmentRepository = appointmentRepository;
         this.qrTokenRepository = qrTokenRepository;
+        this.doctorRepository = doctorRepository;
     }
 
     public AppointmentResponse bookAppointment(AppointmentRequest request){
@@ -43,12 +41,18 @@ public class AppointmentService {
                 () -> new RuntimeException("Hospital not found")
         );
 
+        // Get doctor
+        Doctor doctor = doctorRepository.findById(request.getDoctorId()).orElseThrow(
+                () -> new RuntimeException("Hospital not found")
+        );
+
         // Create appointment
         LocalDateTime time = LocalDateTime.parse(request.getAppointmentTime());
 
         Appointment appointment = new Appointment();
         appointment.setPatient(patient);
         appointment.setHospital(hospital);
+        appointment.setDoctor(doctor);
         appointment.setAppointmentTime(time);
         appointment.setCreatedAt(LocalDateTime.now());
 
