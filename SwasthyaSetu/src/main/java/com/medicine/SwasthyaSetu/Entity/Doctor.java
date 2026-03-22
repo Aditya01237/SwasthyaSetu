@@ -3,6 +3,7 @@ package com.medicine.SwasthyaSetu.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+@Data
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
@@ -15,6 +16,12 @@ public class Doctor {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false)
+    private String specialization;
+
+    @Column(nullable = false)
+    private int experience;
 
     @ManyToOne
     @JoinColumn(name = "hospital_id")
