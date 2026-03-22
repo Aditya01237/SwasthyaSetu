@@ -28,7 +28,7 @@ public class HospitalController {
     }
 
     @GetMapping("/{id}")
-    public HospitalDetailsResponse getAllHospital(@PathVariable String id){
+    public HospitalDetailsResponse getAllHospital(@PathVariable("id") String id){
         return hospitalServices.getHospitalById(id);
     }
 
