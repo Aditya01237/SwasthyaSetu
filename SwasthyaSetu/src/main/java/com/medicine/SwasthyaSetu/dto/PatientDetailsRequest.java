@@ -3,5 +3,5 @@ import lombok.Data;
 
 @Data
 public class PatientDetailsRequest {
-    private String phone;
+    private String uhid;
 }

@@ -1,6 +1,7 @@
 package com.medicine.SwasthyaSetu.controller;
 import com.medicine.SwasthyaSetu.dto.*;
 import com.medicine.SwasthyaSetu.service.PatientService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,11 +24,16 @@ public class PatientController {
         );
     }
 
-    @GetMapping("/history/{phone}")
-    public ResponseEntity<CommonResponse<PatientDetailsResponse>> getPatientDetails(@PathVariable("phone") String phone){
+    @GetMapping("/history")
+    public ResponseEntity<CommonResponse<PatientDetailsResponse>> getPatientDetails(HttpServletRequest request) {
+
+        String uhid = (String) request.getAttribute("uhid");
+
         PatientDetailsRequest patientDetailsRequest = new PatientDetailsRequest();
-        patientDetailsRequest.setPhone(phone);
+        patientDetailsRequest.setUhid(uhid);
+
         PatientDetailsResponse response = patientService.getPatientDetails(patientDetailsRequest);
+
         return ResponseEntity.ok(
                 new CommonResponse<>("Patient details fetched successfully", response, 200)
         );

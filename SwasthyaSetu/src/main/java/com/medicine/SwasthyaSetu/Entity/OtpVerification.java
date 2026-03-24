@@ -17,6 +17,9 @@ public class OtpVerification {
 
     private String phone;
 
+    @Column(unique = true, nullable = false)
+    private String uhid;
+
     private String otp;
 
     private LocalDateTime expiryTime;

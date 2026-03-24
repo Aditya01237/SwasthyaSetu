@@ -3,6 +3,6 @@ import lombok.Data;
 
 @Data
 public class VerifyOtpRequest {
-    private String phone;
+    private String uhid;
     private String otp;
 }

@@ -45,11 +45,12 @@ public class AuthService {
         int otp = 100000 + new Random().nextInt(900000);
 
         // CHECK existing OTP
-        OtpVerification otpEntity = otpVerificationRepository.findByPhone(phone)
+        OtpVerification otpEntity = otpVerificationRepository.findByUhid(request.getUhid())
                 .orElse(new OtpVerification());
 
         // UPDATE fields
         otpEntity.setPhone(phone);
+        otpEntity.setUhid(request.getUhid());
         otpEntity.setOtp(String.valueOf(otp));
         otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otpEntity.setVerified(false);
@@ -62,7 +63,7 @@ public class AuthService {
     // verify otp
 
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request){
-        OtpVerification otp = otpVerificationRepository.findByPhone(request.getPhone()).orElseThrow(
+        OtpVerification otp = otpVerificationRepository.findByUhid(request.getUhid()).orElseThrow(
                 ()-> new RuntimeException("Otp Not Found")
         );
 
@@ -77,17 +78,20 @@ public class AuthService {
         }
 
         // check for current previous session
-        userSessionRepository.findByPhoneAndIsActiveTrue(request.getPhone())
+        userSessionRepository.findByUhidAndIsActiveTrue(request.getUhid())
                 .ifPresent(session -> {
                     session.setActive(false);
                     userSessionRepository.save(session);
                 });
 
+        Patient patient = patientRepository.findByUhid(request.getUhid())
+                .orElseThrow(() -> new RuntimeException("Patient Not Found"));
+
         // Saving Otp Token To backend
         String token_id = UUID.randomUUID().toString();
         UserSession userSession = new UserSession();
+        userSession.setUhid(patient.getUhid());
         userSession.setToken(token_id);
-        userSession.setPhone(request.getPhone());
         userSession.setCreatedAt(LocalDateTime.now());
         userSession.setExpiresAt(LocalDateTime.now().plusMinutes(15));
         userSession.setActive(true);

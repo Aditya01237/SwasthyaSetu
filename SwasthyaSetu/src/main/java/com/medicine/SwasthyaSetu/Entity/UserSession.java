@@ -20,7 +20,7 @@ public class UserSession {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String phone;
+    private String uhid;
 
     private String token;
 

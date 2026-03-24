@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface UserSessionRepository extends JpaRepository<UserSession,Long> {
     Optional<UserSession> findByToken(String token);
-    Optional<UserSession> findByPhoneAndIsActiveTrue(String phone);
+    Optional<UserSession> findByUhidAndIsActiveTrue(String uhid);
 }

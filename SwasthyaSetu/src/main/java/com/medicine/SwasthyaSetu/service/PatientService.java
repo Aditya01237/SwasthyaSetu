@@ -68,7 +68,7 @@ public class PatientService {
 
     public PatientDetailsResponse getPatientDetails(PatientDetailsRequest request){
 
-        OtpVerification otp = otpVerificationRepository.findByPhone(request.getPhone()).orElseThrow(
+        OtpVerification otp = otpVerificationRepository.findByUhid(request.getUhid()).orElseThrow(
                 ()-> new RuntimeException("Otp Not Found")
         );
 
@@ -83,7 +83,7 @@ public class PatientService {
         }
 
         // get patient details
-        Patient patientEntity = patientRepository.findByPhone(request.getPhone()).orElseThrow(
+        Patient patientEntity = patientRepository.findByUhid(request.getUhid()).orElseThrow(
                 ()-> new RuntimeException("Patient Not Found With This Number")
         );
 
