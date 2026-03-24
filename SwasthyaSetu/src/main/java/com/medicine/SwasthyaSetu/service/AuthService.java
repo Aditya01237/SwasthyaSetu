@@ -1,29 +1,38 @@
 package com.medicine.SwasthyaSetu.service;
 import com.medicine.SwasthyaSetu.Entity.OtpVerification;
 import com.medicine.SwasthyaSetu.Entity.Patient;
+import com.medicine.SwasthyaSetu.Entity.UserSession;
 import com.medicine.SwasthyaSetu.dto.SendOtpRequest;
 import com.medicine.SwasthyaSetu.dto.VerifyOtpRequest;
+import com.medicine.SwasthyaSetu.dto.VerifyOtpResponse;
 import com.medicine.SwasthyaSetu.repository.OtpVerificationRepository;
 import com.medicine.SwasthyaSetu.repository.PatientRepository;
+import com.medicine.SwasthyaSetu.repository.UserSessionRepository;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Random;
+import java.util.UUID;
 
 @Service
 public class AuthService {
 
     private final PatientRepository patientRepository;
     private final OtpVerificationRepository otpVerificationRepository;
+    private final UserSessionRepository userSessionRepository;
 
-    public AuthService(PatientRepository patientRepository, OtpVerificationRepository otpVerificationRepository){
+    public AuthService(PatientRepository patientRepository,
+                       OtpVerificationRepository otpVerificationRepository,
+                       UserSessionRepository userSessionRepository
+    ){
         this.patientRepository = patientRepository;
         this.otpVerificationRepository = otpVerificationRepository;
+        this.userSessionRepository = userSessionRepository;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(HospitalServices.class);
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     // Send Otp
     public String sendOtp(SendOtpRequest request){
@@ -52,7 +61,7 @@ public class AuthService {
 
     // verify otp
 
-    public String verifyOtp(VerifyOtpRequest request){
+    public VerifyOtpResponse verifyOtp(VerifyOtpRequest request){
         OtpVerification otp = otpVerificationRepository.findByPhone(request.getPhone()).orElseThrow(
                 ()-> new RuntimeException("Otp Not Found")
         );
@@ -67,9 +76,31 @@ public class AuthService {
             throw new RuntimeException("Invalid OTP");
         }
 
+        // check for current previous session
+        userSessionRepository.findByPhoneAndIsActiveTrue(request.getPhone())
+                .ifPresent(session -> {
+                    session.setActive(false);
+                    userSessionRepository.save(session);
+                });
+
+        // Saving Otp Token To backend
+        String token_id = UUID.randomUUID().toString();
+        UserSession userSession = new UserSession();
+        userSession.setToken(token_id);
+        userSession.setPhone(request.getPhone());
+        userSession.setCreatedAt(LocalDateTime.now());
+        userSession.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        userSession.setActive(true);
+        userSessionRepository.save(userSession);
+
+        VerifyOtpResponse verifyOtpResponse = new VerifyOtpResponse();
+        verifyOtpResponse.setMessage("Login successful");
+        verifyOtpResponse.setToken(token_id);
+
         otp.setVerified(true);
+        otp.setOtp(null);
         otpVerificationRepository.save(otp);
 
-        return "OTP verified successfully";
+        return verifyOtpResponse;
     }
 }

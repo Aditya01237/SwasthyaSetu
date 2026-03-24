@@ -1,20 +1,13 @@
 package com.medicine.SwasthyaSetu.service;
 
-import com.medicine.SwasthyaSetu.Entity.AuditLog;
-import com.medicine.SwasthyaSetu.Entity.Doctor;
-import com.medicine.SwasthyaSetu.Entity.MedicalRecord;
-import com.medicine.SwasthyaSetu.Entity.QRToken;
+import com.medicine.SwasthyaSetu.Entity.*;
 import com.medicine.SwasthyaSetu.dto.QrScanRequest;
 import com.medicine.SwasthyaSetu.dto.QrScanResponse;
-import com.medicine.SwasthyaSetu.repository.AuditLogRepository;
-import com.medicine.SwasthyaSetu.repository.DoctorRepository;
-import com.medicine.SwasthyaSetu.repository.MedicalRecordRepository;
-import com.medicine.SwasthyaSetu.repository.QrTokenRepository;
+import com.medicine.SwasthyaSetu.repository.*;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,16 +17,19 @@ public class QrService {
     private final MedicalRecordRepository medicalRecordRepository;
     private final DoctorRepository doctorRepository;
     private final AuditLogRepository auditLogRepository;
+    private final UserSessionRepository userSessionRepository;
 
     public QrService(QrTokenRepository qrTokenRepository,
                      MedicalRecordRepository medicalRecordRepository,
                      DoctorRepository doctorRepository,
-                     AuditLogRepository auditLogRepository
+                     AuditLogRepository auditLogRepository,
+                     UserSessionRepository userSessionRepository
     ){
         this.qrTokenRepository = qrTokenRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.doctorRepository = doctorRepository;
         this.auditLogRepository = auditLogRepository;
+        this.userSessionRepository = userSessionRepository;
     }
 
     public QrScanResponse scan(QrScanRequest request){
@@ -52,6 +48,7 @@ public class QrService {
         if(qr.isUsed()){
             throw new RuntimeException("QR already used");
         }
+
 
         // check doctor
         Doctor doctor = doctorRepository.findById(request.getDoctorId()).orElseThrow(

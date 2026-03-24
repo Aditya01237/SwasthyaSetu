@@ -29,7 +29,7 @@ public class PatientController {
         patientDetailsRequest.setPhone(phone);
         PatientDetailsResponse response = patientService.getPatientDetails(patientDetailsRequest);
         return ResponseEntity.ok(
-                new CommonResponse<>("Patient registered successfully", response, 200)
+                new CommonResponse<>("Patient details fetched successfully", response, 200)
         );
     }
 
