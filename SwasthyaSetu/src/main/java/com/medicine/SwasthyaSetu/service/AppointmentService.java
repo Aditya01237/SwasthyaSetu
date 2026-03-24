@@ -5,6 +5,8 @@ import com.medicine.SwasthyaSetu.dto.AppointmentRequest;
 import com.medicine.SwasthyaSetu.dto.AppointmentResponse;
 import com.medicine.SwasthyaSetu.repository.*;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -16,6 +18,8 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final QrTokenRepository qrTokenRepository;
     private final DoctorRepository doctorRepository;
+
+    private static final Logger log = LoggerFactory.getLogger(HospitalServices.class);
 
     public AppointmentService(PatientRepository patientRepository,
                               HospitalRepository hospitalRepository,

@@ -1,8 +1,10 @@
 package com.medicine.SwasthyaSetu.controller;
 
+import com.medicine.SwasthyaSetu.dto.CommonResponse;
 import com.medicine.SwasthyaSetu.dto.SendOtpRequest;
 import com.medicine.SwasthyaSetu.dto.VerifyOtpRequest;
 import com.medicine.SwasthyaSetu.service.AuthService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,13 +21,19 @@ public class AuthController {
 
     // send otp
     @PostMapping("/send-otp")
-    public String sendOtp(@RequestBody SendOtpRequest request){
-        return authService.sendOtp(request);
+    public ResponseEntity<CommonResponse<String>> sendOtp(@RequestBody SendOtpRequest request){
+        String response = authService.sendOtp(request);
+        return ResponseEntity.ok(
+                new CommonResponse<>("OTP Sent Successfully", response, 200)
+        );
     }
 
     // Verify otp
     @PostMapping("/verify-otp")
-    public String verifyOtp(@RequestBody VerifyOtpRequest request){
-        return authService.verifyOtp(request);
+    public ResponseEntity<CommonResponse<String>> verifyOtp(@RequestBody VerifyOtpRequest request){
+        String response = authService.verifyOtp(request);
+        return ResponseEntity.ok(
+                new CommonResponse<>("OTP Verified Successfully", response, 200)
+        );
     }
 }

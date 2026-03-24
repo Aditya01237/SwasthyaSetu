@@ -5,6 +5,8 @@ import com.medicine.SwasthyaSetu.dto.HospitalDetailsResponse;
 import com.medicine.SwasthyaSetu.dto.HospitalRegisterRequest;
 import com.medicine.SwasthyaSetu.repository.HospitalRepository;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,17 +19,14 @@ public class HospitalServices {
     public HospitalServices(HospitalRepository hospitalRepository){
         this.hospitalRepository = hospitalRepository;
     }
-    public HospitalDetailsResponse addHospital(HospitalRegisterRequest request){
+    private static final Logger log = LoggerFactory.getLogger(HospitalServices.class);
 
-        System.out.println("This is request\n");
-        System.out.println(request);
+    public HospitalDetailsResponse addHospital(HospitalRegisterRequest request){
 
         Hospital hospital = new Hospital();
         hospital.setName(request.getName());
         hospital.setLocation(request.getLocation());
         hospital.setCreatedAt(LocalDateTime.now());
-
-        System.out.println(hospital);
 
         hospitalRepository.save(hospital);
 
@@ -35,9 +34,7 @@ public class HospitalServices {
         hospitalDetailsResponse.setName(hospital.getName());
         hospitalDetailsResponse.setLocation(hospital.getLocation());
 
-        System.out.println(hospitalDetailsResponse);
-
-        System.out.println("Hospital Created Successfully");
+        log.info("Hospital Created Successfully");
         return hospitalDetailsResponse;
     }
 

@@ -6,6 +6,8 @@ import com.medicine.SwasthyaSetu.dto.VerifyOtpRequest;
 import com.medicine.SwasthyaSetu.repository.OtpVerificationRepository;
 import com.medicine.SwasthyaSetu.repository.PatientRepository;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Random;
@@ -20,6 +22,8 @@ public class AuthService {
         this.patientRepository = patientRepository;
         this.otpVerificationRepository = otpVerificationRepository;
     }
+
+    private static final Logger log = LoggerFactory.getLogger(HospitalServices.class);
 
     // Send Otp
     public String sendOtp(SendOtpRequest request){
@@ -41,7 +45,7 @@ public class AuthService {
         otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otpEntity.setVerified(false);
         otpVerificationRepository.save(otpEntity);
-        System.out.println("OTP : " + otp);
+        log.info("OTP : " + otp);
 
         return "OTP sent successfully";
     }

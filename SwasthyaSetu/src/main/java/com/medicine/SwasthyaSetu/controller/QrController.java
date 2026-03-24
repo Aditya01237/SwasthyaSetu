@@ -1,8 +1,10 @@
 package com.medicine.SwasthyaSetu.controller;
 
+import com.medicine.SwasthyaSetu.dto.CommonResponse;
 import com.medicine.SwasthyaSetu.dto.QrScanRequest;
 import com.medicine.SwasthyaSetu.dto.QrScanResponse;
 import com.medicine.SwasthyaSetu.service.QrService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +19,10 @@ public class QrController {
     }
 
     @PostMapping("/scan")
-    public QrScanResponse scan(@RequestBody QrScanRequest request){
-        return qrService.scan(request);
+    public ResponseEntity<CommonResponse<QrScanResponse>> scan(@RequestBody QrScanRequest request){
+        QrScanResponse response = qrService.scan(request);
+        return ResponseEntity.ok(
+                new CommonResponse<>("Qr Scan", response, 200)
+        );
     }
 }

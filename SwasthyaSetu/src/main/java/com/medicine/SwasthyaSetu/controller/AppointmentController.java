@@ -2,7 +2,9 @@ package com.medicine.SwasthyaSetu.controller;
 
 import com.medicine.SwasthyaSetu.dto.AppointmentRequest;
 import com.medicine.SwasthyaSetu.dto.AppointmentResponse;
+import com.medicine.SwasthyaSetu.dto.CommonResponse;
 import com.medicine.SwasthyaSetu.service.AppointmentService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +19,10 @@ public class AppointmentController {
     }
 
     @PostMapping("/book")
-    public AppointmentResponse book(@RequestBody AppointmentRequest appointmentRequest){
-        return appointmentService.bookAppointment(appointmentRequest);
+    public ResponseEntity<CommonResponse<AppointmentResponse>> book(@RequestBody AppointmentRequest appointmentRequest){
+        AppointmentResponse response = appointmentService.bookAppointment(appointmentRequest);
+        return ResponseEntity.ok(
+                new CommonResponse<>("Appointment registered successfully", response, 200)
+        );
     }
 }
