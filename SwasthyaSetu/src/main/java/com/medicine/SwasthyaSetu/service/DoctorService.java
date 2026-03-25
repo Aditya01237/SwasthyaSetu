@@ -7,6 +7,8 @@ import com.medicine.SwasthyaSetu.repository.DoctorRepository;
 import com.medicine.SwasthyaSetu.repository.HospitalRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class DoctorService {
 
@@ -58,6 +60,20 @@ public class DoctorService {
 
         return doctorResponse;
 
+    }
+
+    public List<DoctorResponse> getDoctorsByHospital(String hospitalId) {
+        List<Doctor> doctors = doctorRepository.findByHospitalId(hospitalId);
+
+        return doctors.stream().map(d -> {
+            DoctorResponse res = new DoctorResponse();
+            res.setId(d.getId());
+            res.setName(d.getName());
+            res.setSpecialization(d.getSpecialization());
+            res.setExperience(d.getExperience());
+            res.setFee(d.getFee());
+            return res;
+        }).toList();
     }
 
 }

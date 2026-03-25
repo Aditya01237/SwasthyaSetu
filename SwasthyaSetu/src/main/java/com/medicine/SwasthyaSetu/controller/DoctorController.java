@@ -7,6 +7,8 @@ import com.medicine.SwasthyaSetu.service.DoctorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/doctor")
 public class DoctorController {
@@ -30,6 +32,17 @@ public class DoctorController {
         DoctorResponse response = doctorService.getDoctorById(id);
         return ResponseEntity.ok(
                 new CommonResponse<>("Doctor Find successfully", response, 200)
+        );
+    }
+
+    @GetMapping("/by-hospital/{hospitalId}")
+    public ResponseEntity<CommonResponse<List<DoctorResponse>>> getDoctors(
+            @PathVariable String hospitalId) {
+
+        List<DoctorResponse> doctors = doctorService.getDoctorsByHospital(hospitalId);
+
+        return ResponseEntity.ok(
+                new CommonResponse<>("Doctors fetched successfully", doctors, 200)
         );
     }
 

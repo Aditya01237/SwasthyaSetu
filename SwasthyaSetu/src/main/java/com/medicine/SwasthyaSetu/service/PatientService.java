@@ -1,13 +1,7 @@
 package com.medicine.SwasthyaSetu.service;
-import com.medicine.SwasthyaSetu.Entity.Appointment;
-import com.medicine.SwasthyaSetu.Entity.MedicalRecord;
-import com.medicine.SwasthyaSetu.Entity.OtpVerification;
-import com.medicine.SwasthyaSetu.Entity.Patient;
+import com.medicine.SwasthyaSetu.Entity.*;
 import com.medicine.SwasthyaSetu.dto.*;
-import com.medicine.SwasthyaSetu.repository.AppointmentRepository;
-import com.medicine.SwasthyaSetu.repository.MedicalRecordRepository;
-import com.medicine.SwasthyaSetu.repository.OtpVerificationRepository;
-import com.medicine.SwasthyaSetu.repository.PatientRepository;
+import com.medicine.SwasthyaSetu.repository.*;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,16 +15,19 @@ public class PatientService {
     private final OtpVerificationRepository otpVerificationRepository;
     private final MedicalRecordRepository medicalRecordRepository;
     private final AppointmentRepository appointmentRepository;
+    private final AuditLogRepository auditLogRepository;
 
     public PatientService(PatientRepository patientRepository,
                           OtpVerificationRepository otpVerificationRepository,
                           MedicalRecordRepository medicalRecordRepository,
-                          AppointmentRepository appointmentRepository
+                          AppointmentRepository appointmentRepository,
+                          AuditLogRepository auditLogRepository
     ){
         this.patientRepository = patientRepository;
         this.otpVerificationRepository = otpVerificationRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.appointmentRepository = appointmentRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     public PatientResponse registerPatient(PatientRegisterRequest request){
@@ -123,5 +120,21 @@ public class PatientService {
         patientDetailsResponse.setMedicalRecord(medicalRecordDTO);
 
         return patientDetailsResponse;
+    }
+
+    public List<AuditLogResponse> getAuditLogs(String uhid) {
+
+        Patient patient = patientRepository.findByUhid(uhid)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+
+        List<AuditLog> logs = auditLogRepository.findByPatientId(patient.getId());
+
+        return logs.stream().map(log -> {
+            AuditLogResponse res = new AuditLogResponse();
+            res.setDoctorName(log.getDoctor().getName());
+            res.setAction(log.getAction());
+            res.setTimestamp(log.getTimestamp());
+            return res;
+        }).toList();
     }
 }

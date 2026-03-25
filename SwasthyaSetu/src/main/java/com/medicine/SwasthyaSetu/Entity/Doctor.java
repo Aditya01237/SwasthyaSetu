@@ -23,6 +23,9 @@ public class Doctor {
     @Column(nullable = false)
     private int experience;
 
+    @Column(nullable = false)
+    private int Fee;
+
     @ManyToOne
     @JoinColumn(name = "hospital_id")
     private Hospital hospital;

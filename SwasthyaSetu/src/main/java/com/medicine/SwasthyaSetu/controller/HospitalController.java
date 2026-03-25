@@ -3,6 +3,7 @@ package com.medicine.SwasthyaSetu.controller;
 import com.medicine.SwasthyaSetu.dto.CommonResponse;
 import com.medicine.SwasthyaSetu.dto.HospitalDetailsResponse;
 import com.medicine.SwasthyaSetu.dto.HospitalRegisterRequest;
+import com.medicine.SwasthyaSetu.dto.HospitalResponse;
 import com.medicine.SwasthyaSetu.service.HospitalServices;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,28 +20,51 @@ public class HospitalController {
         this.hospitalServices = hospitalServices;
     }
 
+    // ✅ Add Hospital
     @PostMapping("/add")
-    public ResponseEntity<CommonResponse<HospitalDetailsResponse>> registerHospital(@RequestBody HospitalRegisterRequest hospitalRegisterRequest){
-        HospitalDetailsResponse response = hospitalServices.addHospital(hospitalRegisterRequest);
+    public ResponseEntity<CommonResponse<HospitalDetailsResponse>> registerHospital(
+            @RequestBody HospitalRegisterRequest request) {
+
+        HospitalDetailsResponse response = hospitalServices.addHospital(request);
+
         return ResponseEntity.ok(
                 new CommonResponse<>("Hospital Registered Successfully", response, 200)
         );
     }
 
+    // ✅ Get All Hospitals (simple)
     @GetMapping("/all")
-    public ResponseEntity<CommonResponse<List<HospitalDetailsResponse>>> getAllHospital(){
+    public ResponseEntity<CommonResponse<List<HospitalDetailsResponse>>> getAllHospital() {
+
         List<HospitalDetailsResponse> response = hospitalServices.getAllHospitals();
+
         return ResponseEntity.ok(
                 new CommonResponse<>("All Hospital Data", response, 200)
         );
     }
 
+    // ✅ Get Hospital By ID (detailed)
     @GetMapping("/{id}")
-    public ResponseEntity<CommonResponse<HospitalDetailsResponse>> getHospitalById(@PathVariable("id") String id){
+    public ResponseEntity<CommonResponse<HospitalDetailsResponse>> getHospitalById(@PathVariable String id) {
+
         HospitalDetailsResponse response = hospitalServices.getHospitalById(id);
+
         return ResponseEntity.ok(
                 new CommonResponse<>("Hospital Available", response, 200)
         );
     }
 
+    // ✅ Filter + Search Hospitals (used in dashboard)
+    @GetMapping("/list")
+    public ResponseEntity<CommonResponse<List<HospitalResponse>>> getHospitals(
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String name
+    ) {
+
+        List<HospitalResponse> hospitals = hospitalServices.getHospitals(city, name);
+
+        return ResponseEntity.ok(
+                new CommonResponse<>("Hospitals fetched successfully", hospitals, 200)
+        );
+    }
 }

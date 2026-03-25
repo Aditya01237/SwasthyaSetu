@@ -9,4 +9,5 @@ public class DoctorResponse {
     private String specialization;
     private int experience;
     private String hospitalName;
+    private int Fee;
 }

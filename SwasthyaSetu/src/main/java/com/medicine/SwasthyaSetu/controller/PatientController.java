@@ -6,6 +6,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/patient")
 public class PatientController {
@@ -36,6 +38,18 @@ public class PatientController {
 
         return ResponseEntity.ok(
                 new CommonResponse<>("Patient details fetched successfully", response, 200)
+        );
+    }
+
+    @GetMapping("/qr-audit")
+    public ResponseEntity<CommonResponse<List<AuditLogResponse>>> getAuditLogs(HttpServletRequest request) {
+
+        String uhid = (String) request.getAttribute("uhid");
+
+        List<AuditLogResponse> logs = patientService.getAuditLogs(uhid);
+
+        return ResponseEntity.ok(
+                new CommonResponse<>("Audit logs fetched successfully", logs, 200)
         );
     }
 

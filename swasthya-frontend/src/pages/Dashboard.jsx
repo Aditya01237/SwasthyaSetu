@@ -1,86 +1,102 @@
 import React, { useEffect, useState } from "react";
 import api from "../api/axios";
+import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
-  const [data, setData] = useState(null);
+  const [hospitals, setHospitals] = useState([]);
+  const [search, setSearch] = useState("");
+  const [city, setCity] = useState("");
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem("token");
+    fetchHospitals();
+  }, []);
 
-        // ❌ If not logged in
-        if (!token) {
-          navigate("/");
-          return;
-        }
-
-        // ✅ NO UHID needed now
-        const res = await api.get("/patient/history");
-
-        setData(res.data.data);
-
-      } catch (err) {
-        console.error(err);
-
-        // 🔥 Invalid token → logout
-        if (err.response?.status === 400 || err.response?.status === 401) {
-          localStorage.clear();
-          navigate("/");
-        }
-      }
-    };
-
-    fetchData();
-  }, [navigate]);
-
-  if (!data)
-    return <p className="text-center mt-10 text-lg">Loading...</p>;
+  const fetchHospitals = async () => {
+    try {
+      const res = await api.get("/hospital/list", {
+        params: {
+          name: search,
+          city: city,
+        },
+      });
+      setHospitals(res.data.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <>
+      <Navbar />
+      <div className="p-6 max-w-6xl mx-auto">
+        {/* 🔍 Filters */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <input
+            type="text"
+            placeholder="Search hospital..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="p-3 border rounded-lg w-full md:w-1/3"
+          />
 
-      {/* Navbar */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+          <input
+            type="text"
+            placeholder="City..."
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className="p-3 border rounded-lg w-full md:w-1/3"
+          />
 
-        <button
-          onClick={() => {
-            localStorage.clear();
-            navigate("/");
-          }}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg"
-        >
-          Logout
-        </button>
-      </div>
+          <button
+            onClick={fetchHospitals}
+            className="bg-blue-600 text-white px-6 rounded-lg"
+          >
+            Search
+          </button>
+        </div>
 
-      {/* Patient */}
-      <div className="bg-white shadow-md rounded-xl p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Patient Details</h2>
-        <p><b>Name:</b> {data.patient.name}</p>
-        <p><b>Age:</b> {data.patient.age}</p>
-        <p><b>Gender:</b> {data.patient.gender}</p>
-      </div>
+        {/* 🏥 Hospitals Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {hospitals.map((h) => (
+            <div
+              key={h.id}
+              onClick={() => navigate(`/hospital/${h.id}`)}
+              className="bg-white rounded-xl shadow hover:shadow-lg transition overflow-hidden cursor-pointer"
+            >
+              {/* Image */}
+              <img
+                src={h.imageUrls?.[0] || "https://via.placeholder.com/400"}
+                alt={h.name}
+                className="w-full h-40 object-cover"
+              />
 
-      {/* Records */}
-      <div className="bg-white shadow-md rounded-xl p-6">
-        <h2 className="text-xl font-semibold mb-4">Medical Records</h2>
+              <div className="p-4">
+                <h2 className="text-lg font-semibold">{h.name}</h2>
 
-        {data.medicalRecord.length === 0 ? (
-          <p>No records found</p>
-        ) : (
-          data.medicalRecord.map((record, index) => (
-            <div key={index} className="border p-4 mb-2 rounded-lg">
-              <p><b>Diagnosis:</b> {record.diagnosis}</p>
-              <p><b>Prescription:</b> {record.prescription}</p>
+                <p className="text-gray-500 text-sm">{h.city}</p>
+
+                <p className="text-sm mt-1">{h.address}</p>
+
+                <p className="text-yellow-500 mt-2">⭐ {h.rating || 4.5}</p>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/hospital/${h.id}`);
+                  }}
+                  className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                >
+                  View Details
+                </button>
+              </div>
             </div>
-          ))
-        )}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
