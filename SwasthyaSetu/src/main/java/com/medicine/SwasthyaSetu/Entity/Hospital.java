@@ -32,7 +32,7 @@ public class Hospital {
     private String email;
 
     // 🔥 Images (separate table with proper naming)
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "hospital_images", joinColumns = @JoinColumn(name = "hospital_id"))
     @Column(name = "image_url")
     private List<String> imageUrls;
@@ -43,13 +43,13 @@ public class Hospital {
     private Integer totalReviews;
 
     // 🔥 Services (separate table)
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "hospital_services", joinColumns = @JoinColumn(name = "hospital_id"))
     @Column(name = "service")
     private List<String> services;
 
     // 🔥 Specializations (separate table)
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "hospital_specializations", joinColumns = @JoinColumn(name = "hospital_id"))
     @Column(name = "specialization")
     private List<String> specializations;

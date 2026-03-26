@@ -56,6 +56,8 @@ public class DoctorService {
         doctorResponse.setName(doctor.getName());
         doctorResponse.setExperience(doctor.getExperience());
         doctorResponse.setSpecialization(doctor.getSpecialization());
+        doctorResponse.setFee(doctor.getFee());
+        doctorResponse.setHospitalId(doctor.getHospital().getId());
         doctorResponse.setHospitalName(doctor.getHospital().getName());
 
         return doctorResponse;

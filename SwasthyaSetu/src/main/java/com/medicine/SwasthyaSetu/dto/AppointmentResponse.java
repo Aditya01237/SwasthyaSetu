@@ -6,4 +6,5 @@ import lombok.Data;
 public class AppointmentResponse {
     private String message;
     private String qrToken;
+    private String appointmentTime;
 }

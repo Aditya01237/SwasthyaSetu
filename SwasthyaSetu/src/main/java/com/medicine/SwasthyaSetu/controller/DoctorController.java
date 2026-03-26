@@ -28,7 +28,7 @@ public class DoctorController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CommonResponse<DoctorResponse>> getDoctorById(@PathVariable("id") Long id){
+    public ResponseEntity<CommonResponse<DoctorResponse>> getDoctorById(@PathVariable Long id){
         DoctorResponse response = doctorService.getDoctorById(id);
         return ResponseEntity.ok(
                 new CommonResponse<>("Doctor Find successfully", response, 200)
