@@ -1,5 +1,8 @@
 package com.medicine.SwasthyaSetu.controller;
+import com.medicine.SwasthyaSetu.Entity.Appointment;
 import com.medicine.SwasthyaSetu.dto.*;
+import com.medicine.SwasthyaSetu.repository.AppointmentRepository;
+import com.medicine.SwasthyaSetu.service.AppointmentService;
 import com.medicine.SwasthyaSetu.service.PatientService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -14,7 +17,8 @@ public class PatientController {
 
     private final PatientService patientService;
 
-    public PatientController(PatientService patientService){
+    public PatientController(PatientService patientService, AppointmentService appointmentService,
+                             AppointmentRepository appointmentRepository){
         this.patientService = patientService;
     }
 
@@ -52,5 +56,4 @@ public class PatientController {
                 new CommonResponse<>("Audit logs fetched successfully", logs, 200)
         );
     }
-
 }

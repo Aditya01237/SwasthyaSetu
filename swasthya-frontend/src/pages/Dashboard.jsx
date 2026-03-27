@@ -3,25 +3,6 @@ import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
 
-/* ─────────────────────────────────────────────
-   Add to your index.html / global CSS:
-   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-
-   Add to tailwind.config.js → theme.extend:
-   fontFamily: {
-     display: ['Playfair Display', 'serif'],
-     sans:    ['DM Sans', 'sans-serif'],
-   },
-   keyframes: {
-     shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
-     fadeUp:  { '0%': { opacity: 0, transform: 'translateY(20px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } },
-   },
-   animation: {
-     shimmer: 'shimmer 1.5s infinite',
-     fadeUp:  'fadeUp 0.4s ease both',
-   },
-───────────────────────────────────────────── */
-
 const SkeletonCard = ({ delay = 0 }) => (
   <div
     className="bg-slate-900 border border-white/5 rounded-2xl overflow-hidden animate-fadeUp"
@@ -207,9 +188,6 @@ const Dashboard = () => {
       {/* ── Results chips ── */}
       {!loading && hospitals.length > 0 && (
         <div className="max-w-5xl mx-auto px-6 mb-5 flex gap-2 flex-wrap">
-          <span className="px-3 py-1.5 rounded-full text-xs border border-white/[0.08] bg-white/[0.02] text-slate-500">
-            <span className="text-slate-300 font-medium">{hospitals.length}</span> results
-          </span>
           {city && (
             <span className="px-3 py-1.5 rounded-full text-xs border border-white/[0.08] bg-white/[0.02] text-slate-500">
               in <span className="text-slate-300 font-medium">{city}</span>

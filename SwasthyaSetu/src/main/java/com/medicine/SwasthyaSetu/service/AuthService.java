@@ -100,6 +100,7 @@ public class AuthService {
         VerifyOtpResponse verifyOtpResponse = new VerifyOtpResponse();
         verifyOtpResponse.setMessage("Login successful");
         verifyOtpResponse.setToken(token_id);
+        verifyOtpResponse.setPatient(patient);
 
         otp.setVerified(true);
         otp.setOtp(null);

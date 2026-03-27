@@ -168,7 +168,7 @@ const HospitalDetails = () => {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to results
+          Back
         </button>
 
         {/* ══════════════════════════════════════
@@ -312,12 +312,6 @@ const HospitalDetails = () => {
 
             {/* CTA */}
             <div className="mt-6 space-y-2.5">
-              <button className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white text-sm font-medium py-3 rounded-xl hover:opacity-90 hover:-translate-y-px active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Book Appointment
-              </button>
               <button className="w-full bg-white/[0.04] border border-white/[0.08] text-slate-300 text-sm font-medium py-2.5 rounded-xl hover:bg-white/[0.07] transition-all duration-200 flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />

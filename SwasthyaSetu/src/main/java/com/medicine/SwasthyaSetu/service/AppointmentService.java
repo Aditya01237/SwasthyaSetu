@@ -1,6 +1,8 @@
 package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.Entity.*;
+import com.medicine.SwasthyaSetu.dto.AppointmentDetailsResponse;
+import com.medicine.SwasthyaSetu.dto.AppointmentListResponse;
 import com.medicine.SwasthyaSetu.dto.AppointmentRequest;
 import com.medicine.SwasthyaSetu.dto.AppointmentResponse;
 import com.medicine.SwasthyaSetu.repository.*;
@@ -10,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -27,7 +31,7 @@ public class AppointmentService {
                               AppointmentRepository appointmentRepository,
                               QrTokenRepository qrTokenRepository,
                               DoctorRepository doctorRepository
-    ){
+    ) {
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
         this.appointmentRepository = appointmentRepository;
@@ -36,7 +40,7 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse bookAppointment(AppointmentRequest request){
+    public AppointmentResponse bookAppointment(AppointmentRequest request) {
 
         Patient patient = patientRepository.findByUhid(request.getUhid())
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
@@ -91,6 +95,44 @@ public class AppointmentService {
         response.setAppointmentTime(time.toString());
 
         return response;
+    }
+
+    public List<AppointmentListResponse> getAppointments(String uhid) {
+
+        Patient patient = patientRepository.findByUhid(uhid)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+
+        List<Appointment> appointmentList = appointmentRepository.findByPatientId(patient.getId());
+
+        return appointmentList.stream().map((d) -> {
+                    AppointmentListResponse appointmentListResponse = new AppointmentListResponse();
+
+                    appointmentListResponse.setId(d.getId());
+                    appointmentListResponse.setTime(d.getAppointmentTime());
+                    appointmentListResponse.setDoctorName(d.getDoctor().getName());
+
+                    return appointmentListResponse;
+                }
+        ).toList();
+    }
+
+    public AppointmentDetailsResponse getAppointmentDetails(Long id) {
+
+        Appointment appt = appointmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+        QRToken qr = qrTokenRepository.findByAppointmentId(id);
+
+        AppointmentDetailsResponse res = new AppointmentDetailsResponse();
+        res.setId(appt.getId());
+        res.setDoctorName(appt.getDoctor().getName());
+        res.setHospitalName(appt.getHospital().getName());
+        res.setTime(appt.getAppointmentTime());
+        res.setQrToken(qr.getToken());
+        res.setValidFrom(qr.getValidFrom());
+        res.setValidTo(qr.getValidTo());
+
+        return res;
     }
 
 }
