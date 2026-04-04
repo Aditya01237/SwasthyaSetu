@@ -1,5 +1,4 @@
 package com.medicine.SwasthyaSetu.Entity;
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -14,17 +13,16 @@ public class Doctor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String name;
-
-    @Column(nullable = false)
     private String specialization;
-
-    @Column(nullable = false)
     private int experience;
+    private int fee;
+
+    @Column(nullable = false, unique = true)
+    private String email;
 
     @Column(nullable = false)
-    private int Fee;
+    private String password;
 
     @ManyToOne
     @JoinColumn(name = "hospital_id")

@@ -16,6 +16,11 @@ public class GlobalExceptionHandler {
                 400
         );
 
+        // ADD THESE 3 LINES
+        System.out.println("=== EXCEPTION MESSAGE: " + ex.getMessage());
+        System.out.println("=== CAUSE: " + ex.getCause());
+        if (ex.getCause() != null) ex.getCause().printStackTrace();
+
         return ResponseEntity.badRequest().body(error);
     }
 

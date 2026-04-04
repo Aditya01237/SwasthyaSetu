@@ -10,6 +10,7 @@ public class AppointmentDetailsResponse {
     private String hospitalName;
     private LocalDateTime time;
     private String qrToken;
+    private Boolean isValid;
 
     // ✅ ADD THESE
     private LocalDateTime validFrom;

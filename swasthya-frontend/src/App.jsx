@@ -130,7 +130,7 @@ function AppWrapper() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/patient">
       <AppWrapper />
     </BrowserRouter>
   );

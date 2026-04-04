@@ -2,6 +2,7 @@ package com.medicine.SwasthyaSetu.config;
 
 import com.medicine.SwasthyaSetu.interceptor.AuthInterceptor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -21,7 +22,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/api/auth/**",
                         "/api/patient/register",
-                        "/api/appointment/**",   // optional if public
+                        "/api/doctor/hospital/**",  // ← add this
                         "/error"
                 );
     }

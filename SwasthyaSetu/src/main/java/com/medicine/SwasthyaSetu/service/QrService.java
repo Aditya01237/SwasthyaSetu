@@ -1,6 +1,7 @@
 package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.Entity.*;
+import com.medicine.SwasthyaSetu.dto.MedicalRecordDTO;
 import com.medicine.SwasthyaSetu.dto.QrScanRequest;
 import com.medicine.SwasthyaSetu.dto.QrScanResponse;
 import com.medicine.SwasthyaSetu.repository.*;
@@ -60,9 +61,13 @@ public class QrService {
         List<MedicalRecord> records = medicalRecordRepository.findByPatientId(qr.getPatient().getId());
 
         // convert to simple list
-        List<String> data = records.stream()
-                .map(r -> r.getDiagnosis() + " | " + r.getPrescription())
-                .collect(Collectors.toList());
+        List<MedicalRecordDTO> data = records.stream().map(res->{
+            MedicalRecordDTO medicalRecordDTO = new MedicalRecordDTO();
+            medicalRecordDTO.setDiagnosis(res.getDiagnosis());
+            medicalRecordDTO.setPrescription(res.getPrescription());
+            medicalRecordDTO.setRecordDate(res.getRecordDate());
+            return medicalRecordDTO;
+        }).toList();
 
         // Mark QR as used
         qr.setUsed(true);

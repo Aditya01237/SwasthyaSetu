@@ -2,6 +2,8 @@ package com.medicine.SwasthyaSetu.controller;
 
 import com.medicine.SwasthyaSetu.dto.*;
 import com.medicine.SwasthyaSetu.service.AppointmentService;
+import com.medicine.SwasthyaSetu.service.QrService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,11 +28,34 @@ public class AppointmentController {
 
     @GetMapping("/my")
     public ResponseEntity<List<AppointmentListResponse>> getMyAppointments(@RequestParam String uhid){
-        return ResponseEntity.ok(appointmentService.getAppointments(uhid));
+        System.out.println("req recived with uhid : " + uhid);
+        List<AppointmentListResponse> appointments = appointmentService.getAppointments(uhid);
+        return ResponseEntity.ok(
+                new CommonResponse<>("Appointments fetched successfully", appointments, 200).getData()
+        );
     }
 
     @GetMapping("/details/{id}")
     public ResponseEntity<AppointmentDetailsResponse> getAppointmentDetails(@PathVariable Long id){
         return ResponseEntity.ok(appointmentService.getAppointmentDetails(id));
+    }
+
+    @GetMapping("/doctor/{id}")
+    public ResponseEntity<AppointmentDetailsDoctorResponse> getDoctorAppointmentDetails(
+            @PathVariable Long id,
+            @RequestParam Long doctorId
+    ) {
+        return ResponseEntity.ok(
+                appointmentService.getDoctorAppointmentDetails(id, doctorId)
+        );
+    }
+
+    @GetMapping("/doctor/today")
+    public ResponseEntity<List<DoctorAppointmentListResponse>> getDoctorAppointments(
+            @RequestParam Long doctorId
+    ) {
+        return ResponseEntity.ok(
+                appointmentService.getTodayAppointmentsForDoctor(doctorId)
+        );
     }
 }

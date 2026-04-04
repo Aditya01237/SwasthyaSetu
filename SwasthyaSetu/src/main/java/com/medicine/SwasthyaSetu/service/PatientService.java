@@ -6,7 +6,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class PatientService {
@@ -42,6 +41,7 @@ public class PatientService {
         // create entity
         Patient patient = new Patient();
         patient.setName(request.getName());
+        patient.setEmail(request.getEmail());
         patient.setAge(request.getAge());
         patient.setPhone(request.getPhone());
         patient.setGender(request.getGender());
@@ -56,6 +56,7 @@ public class PatientService {
         PatientResponse response = new PatientResponse();
         response.setUhid(saved.getUhid());
         response.setName(saved.getName());
+        response.setEmail(saved.getEmail());
         response.setAge(saved.getAge());
         response.setPhone(saved.getPhone());
         response.setGender(saved.getGender());
@@ -88,6 +89,7 @@ public class PatientService {
         PatientInfoDto patientInfoDto = new PatientInfoDto();
         patientInfoDto.setUhid(patientEntity.getUhid());
         patientInfoDto.setName(patientEntity.getName());
+        patientInfoDto.setEmail(patientEntity.getEmail());
         patientInfoDto.setPhone(patientEntity.getPhone());
         patientInfoDto.setAge(patientEntity.getAge());
         patientInfoDto.setGender(patientEntity.getGender());

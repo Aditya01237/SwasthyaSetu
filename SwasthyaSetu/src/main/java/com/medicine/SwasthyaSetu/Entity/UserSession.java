@@ -1,33 +1,28 @@
 package com.medicine.SwasthyaSetu.Entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.*;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Data
 @Entity
-@NoArgsConstructor
-@AllArgsConstructor
+@Table(name = "user_session")
 public class UserSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String uhid;
-
     private String token;
+
+    private String uhid; // patient uhid OR doctor id (string)
+
+    private String role; // PATIENT / DOCTOR
+
+    private boolean isActive;
 
     private LocalDateTime createdAt;
 
     private LocalDateTime expiresAt;
-
-    private boolean isActive;
-
 }

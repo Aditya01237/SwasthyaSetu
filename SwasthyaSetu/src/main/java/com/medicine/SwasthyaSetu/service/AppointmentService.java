@@ -1,16 +1,14 @@
 package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.Entity.*;
-import com.medicine.SwasthyaSetu.dto.AppointmentDetailsResponse;
-import com.medicine.SwasthyaSetu.dto.AppointmentListResponse;
-import com.medicine.SwasthyaSetu.dto.AppointmentRequest;
-import com.medicine.SwasthyaSetu.dto.AppointmentResponse;
+import com.medicine.SwasthyaSetu.dto.*;
 import com.medicine.SwasthyaSetu.repository.*;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +21,7 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final QrTokenRepository qrTokenRepository;
     private final DoctorRepository doctorRepository;
+    private final EmailService emailService;
 
     private static final Logger log = LoggerFactory.getLogger(AppointmentService.class);
 
@@ -30,13 +29,15 @@ public class AppointmentService {
                               HospitalRepository hospitalRepository,
                               AppointmentRepository appointmentRepository,
                               QrTokenRepository qrTokenRepository,
-                              DoctorRepository doctorRepository
+                              DoctorRepository doctorRepository,
+                              EmailService emailService
     ) {
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
         this.appointmentRepository = appointmentRepository;
         this.qrTokenRepository = qrTokenRepository;
         this.doctorRepository = doctorRepository;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -89,6 +90,19 @@ public class AppointmentService {
 
         qrTokenRepository.save(qr);
 
+        // After qrTokenRepository.save(qr);
+
+        emailService.sendAppointmentConfirmationEmail(
+                patient.getEmail(),
+                patient.getName(),
+                doctor.getName(),
+                doctor.getSpecialization(),
+                hospital.getName(),
+                hospital.getAddress(),
+                time.toString(),
+                token
+        );
+
         AppointmentResponse response = new AppointmentResponse();
         response.setMessage("Appointment booked successfully");
         response.setQrToken(token);
@@ -106,11 +120,9 @@ public class AppointmentService {
 
         return appointmentList.stream().map((d) -> {
                     AppointmentListResponse appointmentListResponse = new AppointmentListResponse();
-
                     appointmentListResponse.setId(d.getId());
                     appointmentListResponse.setTime(d.getAppointmentTime());
                     appointmentListResponse.setDoctorName(d.getDoctor().getName());
-
                     return appointmentListResponse;
                 }
         ).toList();
@@ -121,7 +133,8 @@ public class AppointmentService {
         Appointment appt = appointmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
-        QRToken qr = qrTokenRepository.findByAppointmentId(id);
+        QRToken qr = qrTokenRepository.findByAppointmentId(id)
+                .orElseThrow(() -> new RuntimeException("QR not found"));
 
         AppointmentDetailsResponse res = new AppointmentDetailsResponse();
         res.setId(appt.getId());
@@ -133,6 +146,63 @@ public class AppointmentService {
         res.setValidTo(qr.getValidTo());
 
         return res;
+    }
+
+
+    public AppointmentDetailsDoctorResponse getDoctorAppointmentDetails(Long id, Long doctorId) {
+
+        // 🔍 1. Fetch appointment
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+        // 2. Fetch patient
+        Patient patient = appointment.getPatient();
+
+
+        // 🚨 3. SECURITY CHECK
+        if (!appointment.getDoctor().getId().equals(doctorId)) {
+            throw new RuntimeException("Unauthorized access");
+        }
+
+        // 🔎 4. Fetch QR Token
+        QRToken qr = qrTokenRepository.findByAppointmentId(appointment.getId())
+                .orElseThrow(() -> new RuntimeException("QR not found"));
+
+        // 🧾 5. Map response
+        AppointmentDetailsDoctorResponse res = new AppointmentDetailsDoctorResponse();
+
+        res.setName(patient.getName());
+        res.setAge(patient.getAge());
+        res.setGender(patient.getGender());
+        res.setTime(appointment.getAppointmentTime());
+        res.setIsValid(qr.isUsed());
+
+        return res;
+    }
+
+    public List<DoctorAppointmentListResponse> getTodayAppointmentsForDoctor(Long doctorId) {
+
+        System.out.println("DOCTOR ID: " + doctorId);
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(23, 59, 59);
+
+        List<Appointment> appointments = appointmentRepository
+                .findByDoctorIdAndAppointmentTimeBetween(doctorId, startOfDay, endOfDay);
+
+        return appointments.stream().map(appt -> {
+            DoctorAppointmentListResponse res = new DoctorAppointmentListResponse();
+
+            QRToken qr = qrTokenRepository.findByAppointmentId(appt.getId())
+                    .orElseThrow(() -> new RuntimeException("QR not found"));
+
+            res.setId(appt.getId());
+            res.setPatientName(appt.getPatient().getName());
+            res.setTime(appt.getAppointmentTime());
+            res.setValid(qr.isUsed());
+
+            return res;
+        }).toList();
     }
 
 }

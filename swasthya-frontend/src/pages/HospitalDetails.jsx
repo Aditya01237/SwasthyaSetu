@@ -117,8 +117,10 @@ const HospitalDetails = () => {
 
   const fetchDoctors = async () => {
     try {
-      const res = await api.get(`/doctor/by-hospital/${id}`);
+      console.log("I am fetching doctor");
+      const res = await api.get(`/doctor/hospital/${id}`);
       setDoctors(res.data.data);
+      console.log(res);
     } catch (err) {
       console.error(err);
     }

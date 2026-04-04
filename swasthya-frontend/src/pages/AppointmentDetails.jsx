@@ -121,7 +121,7 @@ const AppointmentDetails = () => {
           {/* LEFT */}
           <div className="flex-1 space-y-4">
             <h1 className="text-2xl font-bold text-white">
-              Dr. {appointment.doctorName}
+              {appointment.doctorName}
             </h1>
 
             {/* 🔥 PREMIUM DATE + TIME */}

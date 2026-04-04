@@ -1,5 +1,4 @@
 package com.medicine.SwasthyaSetu.dto;
-import com.medicine.SwasthyaSetu.Entity.Patient;
 import lombok.Data;
 import java.time.LocalDateTime;
 

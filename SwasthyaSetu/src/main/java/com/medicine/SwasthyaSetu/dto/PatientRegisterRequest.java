@@ -10,6 +10,9 @@ public class PatientRegisterRequest {
     @NotBlank(message = "Name is required")
     private String name;
 
+    @NotNull(message = "Email is required")
+    private String email;
+
     @NotNull(message = "Age is required")
     private Integer age;
 

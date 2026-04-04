@@ -35,7 +35,7 @@ public class DoctorController {
         );
     }
 
-    @GetMapping("/by-hospital/{hospitalId}")
+    @GetMapping("/hospital/{hospitalId}")
     public ResponseEntity<CommonResponse<List<DoctorResponse>>> getDoctors(
             @PathVariable String hospitalId) {
 
@@ -45,5 +45,7 @@ public class DoctorController {
                 new CommonResponse<>("Doctors fetched successfully", doctors, 200)
         );
     }
+
+
 
 }

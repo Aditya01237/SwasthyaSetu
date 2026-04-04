@@ -23,50 +23,73 @@ public class AuthInterceptor implements HandlerInterceptor {
                              HttpServletResponse response,
                              Object handler) throws Exception {
 
-        // ✅ 1. Allow preflight (CORS fix)
-        if (request.getMethod().equalsIgnoreCase("OPTIONS")) {
+        String uri = request.getRequestURI();
+
+        // ✅ Allow public routes
+        if (uri.startsWith("/api/auth") || uri.contains("/login") || uri.contains("/register")) {
             return true;
         }
 
-        // ✅ 2. Get Authorization header
+        // ✅ Get Authorization header
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Missing or invalid Authorization header");
-            return false;
+            return unauthorized(response, "Missing or invalid Authorization header");
         }
 
-        // ✅ 3. Extract token
+        // ✅ Extract token
         String token = authHeader.substring(7);
 
-        // ✅ 4. Find session
-        UserSession session = userSessionRepository.findByToken(token)
-                .orElse(null);
+        // ✅ Find session — NULL CHECK FIRST
+        UserSession session = userSessionRepository.findByToken(token).orElse(null);
 
         if (session == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Invalid token");
-            return false;
+            return unauthorized(response, "Invalid token");
         }
 
-        // ✅ 5. Check active
+        // ✅ Check active
         if (!session.isActive()) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Session inactive");
-            return false;
+            return unauthorized(response, "Session inactive");
         }
 
-        // ✅ 6. Check expiry
+        // ✅ Check expiry
         if (LocalDateTime.now().isAfter(session.getExpiresAt())) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Session expired");
-            return false;
+            return unauthorized(response, "Session expired");
         }
 
-        // ✅ 7. Attach UHID
-        request.setAttribute("uhid", session.getUhid());
+        // ✅ Attach user info
+        request.setAttribute("userId", session.getUhid());
+        request.setAttribute("role", session.getRole());
+
+        // ✅ Role-based access — SINGLE CHECK, GET allowed for all
+        if (uri.startsWith("/api/doctor") && !"DOCTOR".equalsIgnoreCase(session.getRole())) {
+            if (!request.getMethod().equalsIgnoreCase("GET")) {
+                return forbidden(response, "Access denied: Doctor only");
+            }
+        }
+
+        if (uri.startsWith("/api/patient") && !"PATIENT".equalsIgnoreCase(session.getRole())) {
+            if (!request.getMethod().equalsIgnoreCase("GET")) {
+                return forbidden(response, "Access denied: Patient only");
+            }
+        }
 
         return true;
+    }
+
+    // 🔥 Unauthorized
+    private boolean unauthorized(HttpServletResponse response, String message) throws Exception {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"message\": \"" + message + "\"}");
+        return false;
+    }
+
+    // 🔥 Forbidden
+    private boolean forbidden(HttpServletResponse response, String message) throws Exception {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"message\": \"" + message + "\"}");
+        return false;
     }
 }
