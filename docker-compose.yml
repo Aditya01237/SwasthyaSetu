@@ -62,7 +62,7 @@ services:
     build:
       context: ./SwasthyaSetu
     environment:
-      SERVER_PORT: 8080
+      SERVER_PORT: 8081
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
@@ -74,7 +74,7 @@ services:
       AI_SERVICE_URL: http://ai-service:8000
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-8081}:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,6 +83,24 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    environment:
+      SERVER_PORT: 8080
+      BACKEND_URL: http://backend:8081
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      backend:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
@@ -96,7 +114,7 @@ services:
     ports:
       - "${PATIENT_FRONTEND_PORT:-5173}:80"
     depends_on:
-      backend:
+      api-gateway:
         condition: service_healthy
 
   doctor-frontend:
@@ -105,7 +123,7 @@ services:
     ports:
       - "${DOCTOR_FRONTEND_PORT:-5174}:80"
     depends_on:
-      backend:
+      api-gateway:
         condition: service_healthy
 
 volumes:

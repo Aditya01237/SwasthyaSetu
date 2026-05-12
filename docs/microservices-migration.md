@@ -22,6 +22,7 @@ This branch starts the migration with container-ready configuration before extra
 - Added Dockerfiles for backend, AI service, and both frontends.
 - Added Docker Compose with PostgreSQL, Redis, RabbitMQ, AI service, current backend, and both frontends.
 - Created local logical databases for the future service split: `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
+- Added `api-gateway` on port `8080` as the first routing layer. During transition it routes all `/api/*` traffic to the current monolith on port `8081`.
 
 ## Local Run
 
@@ -36,15 +37,15 @@ Useful URLs:
 
 - Patient frontend: `http://localhost:5173/patient/`
 - Doctor frontend: `http://localhost:5174/doctor/`
-- Backend health: `http://localhost:8080/actuator/health`
+- Gateway health: `http://localhost:8080/actuator/health`
+- Backend health: `http://localhost:8081/actuator/health`
 - AI health: `http://localhost:8000/health`
 - RabbitMQ UI: `http://localhost:15672`
 
 ## Next Extraction Order
 
-1. Create `api-gateway` and keep frontend traffic on `/api`.
-2. Extract `auth-service` on port `8081`.
-3. Extract `hospital-service` on port `8084`.
-4. Extract `appointment-service` on port `8083` and add Redis slot locks.
-5. Extract `patient-service` on port `8082`.
-6. Add `notification-service` on port `8086` as RabbitMQ consumers.
+1. Extract `auth-service` on port `8081`.
+2. Extract `hospital-service` on port `8084`.
+3. Extract `appointment-service` on port `8083` and add Redis slot locks.
+4. Extract `patient-service` on port `8082`.
+5. Add `notification-service` on port `8086` as RabbitMQ consumers.
