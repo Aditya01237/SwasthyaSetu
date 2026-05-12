@@ -14,12 +14,13 @@ public class GatewayRoutesConfig {
     public RouteLocator swasthyaSetuRoutes(
             RouteLocatorBuilder builder,
             JwtValidationGatewayFilter jwtValidationGatewayFilter,
-            @Value("${app.services.backend-url}") String backendUrl
+            @Value("${app.services.backend-url}") String backendUrl,
+            @Value("${app.services.auth-url}") String authUrl
     ) {
         return builder.routes()
-                .route("auth-service-transition", route -> route
+                .route("auth-service", route -> route
                         .path("/api/auth/**")
-                        .uri(backendUrl))
+                        .uri(authUrl))
                 .route("hospital-service-transition", route -> route
                         .path("/api/hospital/**", "/api/doctor/hospital/**")
                         .uri(backendUrl))
