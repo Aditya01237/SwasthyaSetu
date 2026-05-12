@@ -21,15 +21,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      console.log("Doctor session expired");
-
-      localStorage.removeItem("doctorToken");
-      localStorage.removeItem("doctor");
-
-      window.location.href = "/";
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      console.log("Doctor session expired or forbidden");
+      window.dispatchEvent(new Event("doctorSessionExpired"));
     }
-
     return Promise.reject(err);
   }
 );

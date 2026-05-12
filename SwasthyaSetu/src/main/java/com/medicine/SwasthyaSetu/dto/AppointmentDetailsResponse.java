@@ -15,4 +15,7 @@ public class AppointmentDetailsResponse {
     // ✅ ADD THESE
     private LocalDateTime validFrom;
     private LocalDateTime validTo;
+
+    // ✅ ADD MedicalRecord
+    private MedicalRecordDTO medicalRecord;
 }

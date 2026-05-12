@@ -22,6 +22,7 @@ public class AppointmentService {
     private final QrTokenRepository qrTokenRepository;
     private final DoctorRepository doctorRepository;
     private final EmailService emailService;
+    private final MedicalRecordRepository medicalRecordRepository;
 
     private static final Logger log = LoggerFactory.getLogger(AppointmentService.class);
 
@@ -30,7 +31,8 @@ public class AppointmentService {
                               AppointmentRepository appointmentRepository,
                               QrTokenRepository qrTokenRepository,
                               DoctorRepository doctorRepository,
-                              EmailService emailService
+                              EmailService emailService,
+                              MedicalRecordRepository medicalRecordRepository
     ) {
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
@@ -38,6 +40,7 @@ public class AppointmentService {
         this.qrTokenRepository = qrTokenRepository;
         this.doctorRepository = doctorRepository;
         this.emailService = emailService;
+        this.medicalRecordRepository = medicalRecordRepository;
     }
 
     @Transactional
@@ -89,8 +92,6 @@ public class AppointmentService {
         qr.setUsed(false);
 
         qrTokenRepository.save(qr);
-
-        // After qrTokenRepository.save(qr);
 
         emailService.sendAppointmentConfirmationEmail(
                 patient.getEmail(),
@@ -145,6 +146,21 @@ public class AppointmentService {
         res.setValidFrom(qr.getValidFrom());
         res.setValidTo(qr.getValidTo());
         res.setIsValid(qr.isUsed()); // ✅ tells patient side QR was scanned by doctor
+
+        // Fetch medical record if it exists
+        medicalRecordRepository.findByAppointmentId(id).ifPresent(record -> {
+            MedicalRecordDTO mdto = new MedicalRecordDTO();
+            mdto.setDiagnosis(record.getDiagnosis());
+            mdto.setRecordDate(record.getRecordDate());
+            mdto.setMedicines(record.getMedicines().stream().map(m -> {
+                MedicineDto med = new MedicineDto();
+                med.setName(m.getName());
+                med.setDosage(m.getDosage());
+                med.setFrequency(m.getFrequency());
+                return med;
+            }).toList());
+            res.setMedicalRecord(mdto);
+        });
 
         return res;
     }

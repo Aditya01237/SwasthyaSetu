@@ -34,14 +34,17 @@ const Dashboard = () => {
   const getStatus = (appt) => {
     const now = new Date();
     const apptTime = new Date(appt.time);
-    if (appt.isValid) return "COMPLETED";
-    if (apptTime > now) return "UPCOMING";
+    const expiryTime = new Date(apptTime.getTime() + 3 * 60 * 60 * 1000); // QR is valid for +3 hours
+
+    // Jackson JSON mapper typically strips 'is' from boolean fields, so 'isValid' becomes 'valid'
+    if (appt.valid || appt.isValid) return "DONE";
+    if (now > expiryTime) return "EXPIRED";
     if (apptTime <= now) return "WAITING";
-    return "EXPIRED";
+    return "UPCOMING";
   };
 
   const sortedAppointments = [...appointments].sort((a, b) => {
-    const order = { UPCOMING: 1, WAITING: 2, COMPLETED: 3, EXPIRED: 4 };
+    const order = { UPCOMING: 1, WAITING: 2, DONE: 3, EXPIRED: 4 };
     const statusA = getStatus(a);
     const statusB = getStatus(b);
     if (order[statusA] !== order[statusB]) return order[statusA] - order[statusB];
@@ -49,17 +52,9 @@ const Dashboard = () => {
   });
 
   const total = appointments.length;
-  const completed = appointments.filter((a) => a.isValid).length;
-  const waiting = appointments.filter((a) => {
-    const now = new Date();
-    const time = new Date(a.time);
-    return !a.isValid && time <= now;
-  }).length;
-  const upcoming = appointments.filter((a) => {
-    const now = new Date();
-    const time = new Date(a.time);
-    return !a.isValid && time > now;
-  }).length;
+  const completed = appointments.filter((a) => getStatus(a) === "DONE").length;
+  const waiting = appointments.filter((a) => getStatus(a) === "WAITING").length;
+  const upcoming = appointments.filter((a) => getStatus(a) === "UPCOMING").length;
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -69,7 +64,7 @@ const Dashboard = () => {
   });
 
   const statusStyle = {
-    COMPLETED: "bg-green-500/10 text-green-400 border border-green-500/20",
+    DONE: "bg-green-500/10 text-green-400 border border-green-500/20",
     UPCOMING: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
     WAITING: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20",
     EXPIRED: "bg-red-500/10 text-red-400 border border-red-500/20",

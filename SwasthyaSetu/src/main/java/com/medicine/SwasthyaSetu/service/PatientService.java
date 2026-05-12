@@ -154,11 +154,15 @@ public class PatientService {
     }
 
 
-    public MedicalRecordDTO processPrescription(String uhid, MultipartFile file) {
+    public MedicalRecordDTO processPrescription(String uhid, Long appointmentId, MultipartFile file) {
 
         // 1. Get patient
         Patient patient = patientRepository.findByUhid(uhid)
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
+
+        // 1.5 Get appointment
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
         // 2. OCR + NLP
         PrescriptionResponse ai = aiClient.process(file);
@@ -166,6 +170,7 @@ public class PatientService {
         // 4. Create MedicalRecord
         MedicalRecord record = new MedicalRecord();
         record.setPatient(patient);
+        record.setAppointment(appointment);
         record.setDiagnosis(ai.getDisease());
         record.setRecordDate(LocalDateTime.now());
 

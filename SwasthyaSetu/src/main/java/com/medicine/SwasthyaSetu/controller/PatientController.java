@@ -66,9 +66,10 @@ public class PatientController {
         );
     }
 
-    @PostMapping("/upload-prescription")
+    @PostMapping("/upload-prescription/{appointmentId}")
     public ResponseEntity<?> uploadPrescription(
             HttpServletRequest request,
+            @PathVariable Long appointmentId,
             @RequestParam("file") MultipartFile file
     ) {
         String uhid = (String) request.getAttribute("uhid");
@@ -78,7 +79,7 @@ public class PatientController {
         }
 
         return ResponseEntity.ok(
-                patientService.processPrescription(uhid, file)
+                patientService.processPrescription(uhid, appointmentId, file)
         );
     }
 }

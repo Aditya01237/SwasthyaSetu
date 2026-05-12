@@ -62,6 +62,9 @@ const AppointmentDetails = () => {
     try {
       const res = await api.get(`/appointment/details/${id}`);
       setAppointment(res.data);
+      if (res.data.medicalRecord) {
+        setResult(res.data.medicalRecord);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -89,7 +92,7 @@ const AppointmentDetails = () => {
       setUploadError(null);
       const form = new FormData();
       form.append("file", file);
-      const res = await api.post("/patient/upload-prescription", form, {
+      const res = await api.post(`/patient/upload-prescription/${id}`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setResult(res.data);
@@ -129,6 +132,7 @@ const AppointmentDetails = () => {
   const fromDT      = fmt(appointment.validFrom);
   const toDT        = fmt(appointment.validTo);
   const qrScanned   = appointment.isValid === true;   // doctor scanned → show upload
+  const hasPrescription = !!result;
 
   return (
     <div className="min-h-screen bg-[#090c12] text-slate-200">
@@ -186,7 +190,7 @@ const AppointmentDetails = () => {
             )}
 
             {/* QR-scanned badge */}
-            {qrScanned && (
+            {qrScanned && !hasPrescription && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 w-fit">
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -207,11 +211,18 @@ const AppointmentDetails = () => {
               </>
             )}
 
-            {qrScanned && (
+            {qrScanned && !hasPrescription && (
               <div className="flex flex-col items-center gap-2 text-center">
                 <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-4xl">✅</div>
                 <p className="text-xs text-emerald-400 font-medium">QR Verified</p>
                 <p className="text-xs text-slate-600">Upload prescription below</p>
+              </div>
+            )}
+
+            {hasPrescription && (
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="w-20 h-20 rounded-full bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-4xl">📄</div>
+                <p className="text-xs text-sky-400 font-medium">Prescription Saved</p>
               </div>
             )}
 
@@ -231,8 +242,14 @@ const AppointmentDetails = () => {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-xl">💊</div>
               <div>
-                <h2 className="text-base font-semibold text-slate-100">Upload Prescription</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Take a photo of your prescription — our AI will extract medicines and save your record</p>
+                <h2 className="text-base font-semibold text-slate-100">
+                  {hasPrescription ? "Prescription Records" : "Upload Prescription"}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {hasPrescription 
+                    ? "Medicines extracted from your uploaded prescription" 
+                    : "Take a photo of your prescription — our AI will extract medicines and save your record"}
+                </p>
               </div>
             </div>
 
@@ -324,14 +341,16 @@ const AppointmentDetails = () => {
             {/* ── AI RESULT ─────────────────────────────────────────────── */}
             {result && (
               <div className="space-y-4 animate-fadeUp">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
+                {!appointment.medicalRecord && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-emerald-400">Prescription saved to your medical records</p>
                   </div>
-                  <p className="text-sm font-medium text-emerald-400">Prescription saved to your medical records</p>
-                </div>
+                )}
 
                 {/* Diagnosis */}
                 <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
@@ -378,14 +397,6 @@ const AppointmentDetails = () => {
                     </pre>
                   </details>
                 )}
-
-                {/* Upload another */}
-                <button
-                  onClick={() => { setResult(null); setFile(null); setPreview(null); setUploadError(null); }}
-                  className="w-full py-2.5 rounded-xl border border-white/[0.08] text-slate-400 text-sm hover:bg-white/[0.04] transition-all"
-                >
-                  + Upload another prescription
-                </button>
               </div>
             )}
           </div>

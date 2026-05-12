@@ -40,8 +40,10 @@ const MyAppointment = () => {
     };
   };
 
-  const upcomingList = appointments.filter((a) => isUpcoming(a.time));
-  const pastList = appointments.filter((a) => !isUpcoming(a.time));
+  const sortedAppointments = [...appointments].sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  const upcomingList = sortedAppointments.filter((a) => isUpcoming(a.time));
+  const pastList = sortedAppointments.filter((a) => !isUpcoming(a.time));
 
   const AppointmentCard = ({ a, past = false }) => {
     const { date, time } = formatDateTime(a.time);

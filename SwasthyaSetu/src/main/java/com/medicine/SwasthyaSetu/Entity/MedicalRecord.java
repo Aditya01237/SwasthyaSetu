@@ -21,6 +21,10 @@ public class MedicalRecord {
     @JoinColumn(name = "patient_id")
     private Patient patient;
 
+    @OneToOne
+    @JoinColumn(name = "appointment_id")
+    private Appointment appointment;
+
     private String diagnosis;
 
     @OneToMany(mappedBy = "medicalRecord", cascade = CascadeType.ALL)
