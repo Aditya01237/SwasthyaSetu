@@ -2,6 +2,7 @@ package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.Entity.*;
 import com.medicine.SwasthyaSetu.dto.MedicalRecordDTO;
+import com.medicine.SwasthyaSetu.dto.MedicineDto;
 import com.medicine.SwasthyaSetu.dto.QrScanRequest;
 import com.medicine.SwasthyaSetu.dto.QrScanResponse;
 import com.medicine.SwasthyaSetu.repository.*;
@@ -18,19 +19,16 @@ public class QrService {
     private final MedicalRecordRepository medicalRecordRepository;
     private final DoctorRepository doctorRepository;
     private final AuditLogRepository auditLogRepository;
-    private final UserSessionRepository userSessionRepository;
 
     public QrService(QrTokenRepository qrTokenRepository,
                      MedicalRecordRepository medicalRecordRepository,
                      DoctorRepository doctorRepository,
-                     AuditLogRepository auditLogRepository,
-                     UserSessionRepository userSessionRepository
+                     AuditLogRepository auditLogRepository
     ){
         this.qrTokenRepository = qrTokenRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.doctorRepository = doctorRepository;
         this.auditLogRepository = auditLogRepository;
-        this.userSessionRepository = userSessionRepository;
     }
 
     public QrScanResponse scan(QrScanRequest request){
@@ -61,12 +59,23 @@ public class QrService {
         List<MedicalRecord> records = medicalRecordRepository.findByPatientId(qr.getPatient().getId());
 
         // convert to simple list
-        List<MedicalRecordDTO> data = records.stream().map(res->{
-            MedicalRecordDTO medicalRecordDTO = new MedicalRecordDTO();
-            medicalRecordDTO.setDiagnosis(res.getDiagnosis());
-            medicalRecordDTO.setPrescription(res.getPrescription());
-            medicalRecordDTO.setRecordDate(res.getRecordDate());
-            return medicalRecordDTO;
+        List<MedicalRecordDTO> data = records.stream().map(res -> {
+
+            MedicalRecordDTO dto = new MedicalRecordDTO();
+            dto.setDiagnosis(res.getDiagnosis());
+            dto.setRecordDate(res.getRecordDate());
+
+            dto.setMedicines(
+                    res.getMedicines().stream().map(m -> {
+                        MedicineDto md = new MedicineDto();
+                        md.setName(m.getName());
+                        md.setDosage(m.getDosage());
+                        md.setFrequency(m.getFrequency());
+                        return md;
+                    }).toList()
+            );
+
+            return dto;
         }).toList();
 
         // Mark QR as used

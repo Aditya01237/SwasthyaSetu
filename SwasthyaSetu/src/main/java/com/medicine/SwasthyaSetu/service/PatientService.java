@@ -3,6 +3,7 @@ import com.medicine.SwasthyaSetu.Entity.*;
 import com.medicine.SwasthyaSetu.dto.*;
 import com.medicine.SwasthyaSetu.repository.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,18 +16,22 @@ public class PatientService {
     private final MedicalRecordRepository medicalRecordRepository;
     private final AppointmentRepository appointmentRepository;
     private final AuditLogRepository auditLogRepository;
+    private final AiClient aiClient;
 
-    public PatientService(PatientRepository patientRepository,
-                          OtpVerificationRepository otpVerificationRepository,
-                          MedicalRecordRepository medicalRecordRepository,
-                          AppointmentRepository appointmentRepository,
-                          AuditLogRepository auditLogRepository
+    public PatientService(
+            PatientRepository patientRepository,
+            OtpVerificationRepository otpVerificationRepository,
+            MedicalRecordRepository medicalRecordRepository,
+            AppointmentRepository appointmentRepository,
+            AuditLogRepository auditLogRepository,
+            AiClient aiClient
     ){
         this.patientRepository = patientRepository;
         this.otpVerificationRepository = otpVerificationRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.appointmentRepository = appointmentRepository;
         this.auditLogRepository = auditLogRepository;
+        this.aiClient = aiClient;
     }
 
     public PatientResponse registerPatient(PatientRegisterRequest request){
@@ -100,8 +105,16 @@ public class PatientService {
         // change to medical dto
         List<MedicalRecordDTO> medicalRecordDTO = medicalRecord.stream().map(r -> {
             MedicalRecordDTO dto = new MedicalRecordDTO();
+            dto.setMedicines(
+                    r.getMedicines().stream().map(m -> {
+                        MedicineDto md = new MedicineDto();
+                        md.setName(m.getName());
+                        md.setDosage(m.getDosage());
+                        md.setFrequency(m.getFrequency());
+                        return md;
+                    }).toList()
+            );
             dto.setDiagnosis(r.getDiagnosis());
-            dto.setPrescription(r.getPrescription());
             dto.setRecordDate(r.getRecordDate());
             return dto;
         }).toList();
@@ -138,5 +151,54 @@ public class PatientService {
             res.setTimestamp(log.getTimestamp());
             return res;
         }).toList();
+    }
+
+
+    public MedicalRecordDTO processPrescription(String uhid, MultipartFile file) {
+
+        // 1. Get patient
+        Patient patient = patientRepository.findByUhid(uhid)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+
+        // 2. OCR + NLP
+        PrescriptionResponse ai = aiClient.process(file);
+
+        // 4. Create MedicalRecord
+        MedicalRecord record = new MedicalRecord();
+        record.setPatient(patient);
+        record.setDiagnosis(ai.getDisease());
+        record.setRecordDate(LocalDateTime.now());
+
+        // 5. Medicines
+        List<Medicine> medicines = ai.getMedicines().stream().map(m -> {
+            Medicine med = new Medicine();
+            med.setName(m.getName());
+            med.setDosage(m.getDosage());
+            med.setFrequency(m.getFrequency());
+            med.setMedicalRecord(record);
+            return med;
+        }).toList();
+
+        record.setMedicines(medicines);
+
+        // 6. Save
+        MedicalRecord saved = medicalRecordRepository.save(record);
+
+        // 7. Convert to DTO
+        MedicalRecordDTO dto = new MedicalRecordDTO();
+        dto.setDiagnosis(saved.getDiagnosis());
+        dto.setRecordDate(saved.getRecordDate());
+
+        dto.setMedicines(
+                saved.getMedicines().stream().map(m -> {
+                    MedicineDto md = new MedicineDto();
+                    md.setName(m.getName());
+                    md.setDosage(m.getDosage());
+                    md.setFrequency(m.getFrequency());
+                    return md;
+                }).toList()
+        );
+
+        return dto;
     }
 }

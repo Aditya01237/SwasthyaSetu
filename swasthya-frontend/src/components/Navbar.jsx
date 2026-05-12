@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const Navbar = () => {
@@ -8,8 +8,11 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
 
   // ✅ Get user from localStorage
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = useMemo(() => {
+    return JSON.parse(localStorage.getItem("user"));
+  }, []);
   console.log(user);
+  
 
   const handleLogout = () => {
     localStorage.clear();

@@ -2,12 +2,11 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "/api",
-  withCredentials: true,
 });
 
-// ✅ REQUEST INTERCEPTOR
+// attach token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("patientToken");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -16,18 +15,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ✅ RESPONSE INTERCEPTOR (MAIN LOGIC)
+// handle auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 500) {
-      // your backend throws RuntimeException → comes as 500
+    if (error.response) {
+      if (error.response.status === 401 || error.response.status === 403) {
+        console.log("Patient session expired");
 
-      if (
-        error.response.data?.message?.includes("Session expired") ||
-        error.response.data?.message?.includes("Invalid token")
-      ) {
-        window.dispatchEvent(new Event("sessionExpired"));
+        localStorage.removeItem("patientToken");
+
+        window.location.href = "/";
       }
     }
 

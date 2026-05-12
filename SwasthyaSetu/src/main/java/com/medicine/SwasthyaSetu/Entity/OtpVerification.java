@@ -20,6 +20,8 @@ public class OtpVerification {
     @Column(unique = true, nullable = false)
     private String uhid;
 
+    private String email;
+
     private String otp;
 
     private LocalDateTime expiryTime;

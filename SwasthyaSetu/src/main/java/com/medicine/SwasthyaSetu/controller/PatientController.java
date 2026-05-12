@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -35,6 +36,10 @@ public class PatientController {
 
         String uhid = (String) request.getAttribute("uhid");
 
+        if (uhid == null) {
+            throw new RuntimeException("Unauthorized: UHID missing");
+        }
+
         PatientDetailsRequest patientDetailsRequest = new PatientDetailsRequest();
         patientDetailsRequest.setUhid(uhid);
 
@@ -50,10 +55,30 @@ public class PatientController {
 
         String uhid = (String) request.getAttribute("uhid");
 
+        if (uhid == null) {
+            throw new RuntimeException("Unauthorized: UHID missing");
+        }
+
         List<AuditLogResponse> logs = patientService.getAuditLogs(uhid);
 
         return ResponseEntity.ok(
                 new CommonResponse<>("Audit logs fetched successfully", logs, 200)
+        );
+    }
+
+    @PostMapping("/upload-prescription")
+    public ResponseEntity<?> uploadPrescription(
+            HttpServletRequest request,
+            @RequestParam("file") MultipartFile file
+    ) {
+        String uhid = (String) request.getAttribute("uhid");
+
+        if (uhid == null) {
+            throw new RuntimeException("Unauthorized: UHID missing");
+        }
+
+        return ResponseEntity.ok(
+                patientService.processPrescription(uhid, file)
         );
     }
 }

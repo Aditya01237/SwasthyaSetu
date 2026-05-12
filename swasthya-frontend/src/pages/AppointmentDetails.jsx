@@ -11,18 +11,17 @@ const AppointmentDetails = () => {
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 🔥 NEW STATES
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
     fetchDetails();
   }, []);
 
   const fetchDetails = async () => {
     try {
-      const res = await api.get(`/appointment/details/${id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
+      const res = await api.get(`/appointment/details/${id}`);
       setAppointment(res.data);
     } catch (err) {
       console.error(err);
@@ -31,7 +30,7 @@ const AppointmentDetails = () => {
     }
   };
 
-  // 🔥 PREMIUM DATE FORMAT
+  // 📅 FORMAT DATE
   const formatDateTime = (time) => {
     if (!time) return { date: "—", time: "—" };
 
@@ -51,6 +50,7 @@ const AppointmentDetails = () => {
     };
   };
 
+  // 🟢 STATUS
   const getStatus = () => {
     if (!appointment) return "Unknown";
 
@@ -63,6 +63,7 @@ const AppointmentDetails = () => {
     return "Active";
   };
 
+  // ⏳ TIME LEFT
   const getRemainingTime = () => {
     if (!appointment) return "";
 
@@ -77,6 +78,51 @@ const AppointmentDetails = () => {
   };
 
   const status = getStatus();
+
+  // 📁 HANDLE FILE
+  const handleFileUpload = (selectedFile) => {
+    setFile(selectedFile);
+  };
+
+  // 🚀 UPLOAD API CALL
+  const uploadPrescription = async () => {
+    if (!file) {
+      alert("Please select a file first");
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await api.post(
+        "/patient/upload-prescription",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      console.log(res.data);
+      alert("Prescription uploaded successfully!");
+
+      setFile(null);
+    } catch (err) {
+      console.error(err);
+
+      if (err.response?.data?.message) {
+        alert(err.response.data.message);
+      } else {
+        alert("Upload failed");
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (loading) {
     return <div className="text-white p-10">Loading...</div>;
@@ -95,7 +141,7 @@ const AppointmentDetails = () => {
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
-        {/* ── Back button ── */}
+        {/* BACK BUTTON */}
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-slate-500 text-sm hover:text-sky-400 transition-colors mb-8 group"
@@ -124,9 +170,7 @@ const AppointmentDetails = () => {
               {appointment.doctorName}
             </h1>
 
-            {/* 🔥 PREMIUM DATE + TIME */}
             <div className="flex items-center gap-6">
-              {/* DATE */}
               <div className="flex items-center gap-2 text-sm text-slate-300">
                 <div className="w-9 h-9 rounded-lg bg-sky-500/10 flex items-center justify-center">
                   📅
@@ -137,7 +181,6 @@ const AppointmentDetails = () => {
                 </div>
               </div>
 
-              {/* TIME */}
               <div className="flex items-center gap-2 text-sm text-slate-300">
                 <div className="w-9 h-9 rounded-lg bg-violet-500/10 flex items-center justify-center">
                   ⏰
@@ -149,40 +192,78 @@ const AppointmentDetails = () => {
               </div>
             </div>
 
-            {/* Hospital */}
             <p className="text-slate-500 text-sm">
               Hospital: {appointment.hospitalName}
             </p>
 
-            {/* STATUS */}
             <div
               className={`inline-block px-3 py-1 text-xs rounded-full border
-              ${
-                status === "Active"
+              ${status === "Active"
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                   : status === "Upcoming"
                     ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
                     : "bg-red-500/10 text-red-400 border-red-500/20"
-              }`}
+                }`}
             >
               {status}
             </div>
 
-            {/* COUNTDOWN */}
             {status === "Active" && (
-              <p className="text-xs text-slate-400">⏳ {getRemainingTime()}</p>
+              <p className="text-xs text-slate-400">
+                ⏳ {getRemainingTime()}
+              </p>
             )}
           </div>
 
-          {/* RIGHT: QR */}
+          {/* RIGHT */}
           <div className="flex flex-col items-center justify-center gap-3">
-            <div className="bg-white p-4 rounded-xl shadow-lg shadow-sky-500/10">
-              <QRCodeCanvas value={appointment.qrToken} size={180} />
-            </div>
+            {/* QR (only if not expired) */}
+            {status !== "Expired" && (
+              <>
+                <div className="bg-white p-4 rounded-xl shadow-lg shadow-sky-500/10">
+                  <QRCodeCanvas value={appointment.qrToken} size={180} />
+                </div>
 
-            <p className="text-xs text-slate-500 text-center">
-              Show this QR at hospital
-            </p>
+                <p className="text-xs text-slate-500 text-center">
+                  Show this QR at hospital
+                </p>
+              </>
+            )}
+
+            {/* 🔥 UPLOAD SECTION */}
+            {status === "Expired" && (
+              <div className="flex flex-col items-center gap-3 mt-2">
+                <p className="text-sm text-slate-400">
+                  Upload your prescription
+                </p>
+
+                <label className="cursor-pointer bg-white/10 px-4 py-2 rounded-lg text-sm hover:bg-white/20">
+                  Choose Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) =>
+                      handleFileUpload(e.target.files[0])
+                    }
+                  />
+                </label>
+
+                {file && (
+                  <p className="text-xs text-green-400">
+                    Selected: {file.name}
+                  </p>
+                )}
+
+                <button
+                  onClick={uploadPrescription}
+                  disabled={uploading}
+                  className="bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm transition"
+                >
+                  {uploading ? "Uploading..." : "Upload Prescription"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -191,7 +272,6 @@ const AppointmentDetails = () => {
           <h2 className="text-sm text-slate-400 mb-4">QR Validity</h2>
 
           <div className="flex gap-8">
-            {/* FROM */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
                 🟢
@@ -204,7 +284,6 @@ const AppointmentDetails = () => {
               </div>
             </div>
 
-            {/* TO */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-red-500/10 rounded-lg flex items-center justify-center">
                 🔴

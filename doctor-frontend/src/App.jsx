@@ -9,15 +9,15 @@ import DoctorProfilePage from "./pages/DoctorProfilePage";
 const App = () => {
   return (
     <div className="font-sans bg-[#090c12] text-slate-200 min-h-screen">
-      <BrowserRouter basename="/doctor">
+      <BrowserRouter basename={import.meta.env.PROD ? "/doctor" : ""}>
         <Routes>
 
-          {/* 🔐 Login */}
+          {/* Login */}
           <Route path="/" element={<Login />} />
 
           <Route path="/register" element={<Register />} />
 
-          {/* 🔒 Protected Routes */}
+          {/* Protected */}
           <Route
             path="/dashboard"
             element={
@@ -28,7 +28,6 @@ const App = () => {
           />
 
           <Route path="/appointment/:id" element={<AppointmentDetails />} />
-
           <Route path="/profile" element={<DoctorProfilePage />} />
 
         </Routes>

@@ -4,6 +4,7 @@ package com.medicine.SwasthyaSetu.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -22,7 +23,8 @@ public class MedicalRecord {
 
     private String diagnosis;
 
-    private String prescription;
+    @OneToMany(mappedBy = "medicalRecord", cascade = CascadeType.ALL)
+    private List<Medicine> medicines;
 
     private LocalDateTime recordDate;
 }

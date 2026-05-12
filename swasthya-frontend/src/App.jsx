@@ -130,7 +130,7 @@ function AppWrapper() {
 
 function App() {
   return (
-    <BrowserRouter basename="/patient">
+    <BrowserRouter basename={import.meta.env.PROD ? "/patient" : "/"}>
       <AppWrapper />
     </BrowserRouter>
   );

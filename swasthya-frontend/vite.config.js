@@ -1,16 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: '/patient/',
+
+  // ✅ ONLY use base in production
+  base: command === "build" ? "/patient/" : "/",
+
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
+      "/api": {
+        target: "http://localhost:8080",
         changeOrigin: true,
-      }
-    }
-  }
-})
+      },
+    },
+  },
+}));

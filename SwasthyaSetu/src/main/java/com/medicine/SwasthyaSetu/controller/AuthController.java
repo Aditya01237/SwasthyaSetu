@@ -2,6 +2,7 @@ package com.medicine.SwasthyaSetu.controller;
 
 import com.medicine.SwasthyaSetu.dto.*;
 import com.medicine.SwasthyaSetu.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,12 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+    }
+
+    @GetMapping("/profile")
+    public String getProfile(HttpServletRequest request) {
+        String userId = (String) request.getAttribute("userId");
+        return "User ID: " + userId;
     }
 
     @PostMapping("/send-otp")
@@ -29,6 +36,18 @@ public class AuthController {
         return ResponseEntity.ok(
                 new CommonResponse<>("Login success", authService.verifyOtp(req), 200)
         );
+    }
+
+    @PostMapping("/doctor/send-otp")
+    public ResponseEntity<?> sendDoctorOtp(@RequestParam String email) {
+        return ResponseEntity.ok(authService.sendDoctorOtp(email));
+    }
+
+    @PostMapping("/doctor/verify-otp")
+    public ResponseEntity<?> verifyDoctorOtp(@RequestParam String email,
+                                             @RequestParam String otp) {
+        authService.verifyDoctorOtp(email, otp);
+        return ResponseEntity.ok("Email verified successfully");
     }
 
     @PostMapping("/doctor/login")
