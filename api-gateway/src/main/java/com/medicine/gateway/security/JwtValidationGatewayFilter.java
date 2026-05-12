@@ -1,11 +1,13 @@
 package com.medicine.gateway.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -36,11 +38,30 @@ public class JwtValidationGatewayFilter implements GatewayFilter {
 
         try {
             String token = authorization.substring(7);
-            Jwts.parserBuilder()
+            Claims claims = Jwts.parserBuilder()
                     .setSigningKey(signingKey)
                     .build()
-                    .parseClaimsJws(token);
-            return chain.filter(exchange);
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            String subject = claims.getSubject();
+            if (subject == null || subject.isBlank()) {
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+
+            ServerHttpRequest mutatedRequest = exchange.getRequest()
+                    .mutate()
+                    .headers(headers -> {
+                        headers.set("X-User-Id", subject);
+                        Object role = claims.get("role");
+                        if (role != null) {
+                            headers.set("X-User-Role", role.toString());
+                        }
+                    })
+                    .build();
+
+            return chain.filter(exchange.mutate().request(mutatedRequest).build());
         } catch (Exception ex) {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
