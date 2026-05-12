@@ -25,6 +25,11 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health():
+    return {"status": "UP", "service": "ai-service"}
+
+
 class Request(BaseModel):
     image: str  # base64-encoded image
 

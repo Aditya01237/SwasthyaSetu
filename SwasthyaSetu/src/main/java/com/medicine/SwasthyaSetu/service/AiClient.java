@@ -1,6 +1,7 @@
 package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.dto.PrescriptionResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,6 +13,11 @@ import java.util.Map;
 public class AiClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final String aiServiceUrl;
+
+    public AiClient(@Value("${ai.service.url:http://localhost:8000}") String aiServiceUrl) {
+        this.aiServiceUrl = aiServiceUrl;
+    }
 
     public PrescriptionResponse process(MultipartFile file) {
 
@@ -19,7 +25,7 @@ public class AiClient {
             // convert image → base64
             String base64 = Base64.getEncoder().encodeToString(file.getBytes());
 
-            String url = "http://localhost:8000/process";
+            String url = aiServiceUrl + "/process";
 
             Map<String, String> request = Map.of("image", base64);
 
