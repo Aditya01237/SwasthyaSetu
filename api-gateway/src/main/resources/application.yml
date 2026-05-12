@@ -9,6 +9,7 @@ app:
   services:
     backend-url: ${BACKEND_URL:http://localhost:8081}
     auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    hospital-url: ${HOSPITAL_SERVICE_URL:http://localhost:8084}
 
 jwt:
   secret: ${JWT_SECRET:change-me-to-at-least-32-characters}

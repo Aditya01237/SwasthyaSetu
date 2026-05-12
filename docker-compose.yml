@@ -114,6 +114,25 @@ services:
       timeout: 5s
       retries: 10
 
+  hospital-service:
+    build:
+      context: ./hospital-service
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
+    ports:
+      - "${HOSPITAL_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -121,6 +140,7 @@ services:
       SERVER_PORT: 8080
       BACKEND_URL: http://backend:8090
       AUTH_SERVICE_URL: http://auth-service:8081
+      HOSPITAL_SERVICE_URL: http://hospital-service:8084
       JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
@@ -128,6 +148,8 @@ services:
       backend:
         condition: service_healthy
       auth-service:
+        condition: service_healthy
+      hospital-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
