@@ -133,6 +133,33 @@ services:
       timeout: 5s
       retries: 10
 
+  appointment-service:
+    build:
+      context: ./appointment-service
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+    ports:
+      - "${APPOINTMENT_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -141,6 +168,7 @@ services:
       BACKEND_URL: http://backend:8090
       AUTH_SERVICE_URL: http://auth-service:8081
       HOSPITAL_SERVICE_URL: http://hospital-service:8084
+      APPOINTMENT_SERVICE_URL: http://appointment-service:8083
       JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
@@ -150,6 +178,8 @@ services:
       auth-service:
         condition: service_healthy
       hospital-service:
+        condition: service_healthy
+      appointment-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]

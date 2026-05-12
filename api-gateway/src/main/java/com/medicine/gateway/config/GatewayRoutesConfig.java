@@ -16,7 +16,8 @@ public class GatewayRoutesConfig {
             JwtValidationGatewayFilter jwtValidationGatewayFilter,
             @Value("${app.services.backend-url}") String backendUrl,
             @Value("${app.services.auth-url}") String authUrl,
-            @Value("${app.services.hospital-url}") String hospitalUrl
+            @Value("${app.services.hospital-url}") String hospitalUrl,
+            @Value("${app.services.appointment-url}") String appointmentUrl
     ) {
         return builder.routes()
                 .route("auth-service", route -> route
@@ -29,8 +30,12 @@ public class GatewayRoutesConfig {
                         .path("/api/doctor/**")
                         .filters(filter -> filter.filter(jwtValidationGatewayFilter))
                         .uri(hospitalUrl))
+                .route("appointment-service", route -> route
+                        .path("/api/appointment/**", "/api/qr/**")
+                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
+                        .uri(appointmentUrl))
                 .route("protected-monolith-transition", route -> route
-                        .path("/api/patient/**", "/api/appointment/**", "/api/qr/**")
+                        .path("/api/patient/**")
                         .filters(filter -> filter.filter(jwtValidationGatewayFilter))
                         .uri(backendUrl))
                 .build();
