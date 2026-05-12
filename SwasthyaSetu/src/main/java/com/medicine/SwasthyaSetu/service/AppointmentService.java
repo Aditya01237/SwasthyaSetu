@@ -144,6 +144,7 @@ public class AppointmentService {
         res.setQrToken(qr.getToken());
         res.setValidFrom(qr.getValidFrom());
         res.setValidTo(qr.getValidTo());
+        res.setIsValid(qr.isUsed()); // ✅ tells patient side QR was scanned by doctor
 
         return res;
     }

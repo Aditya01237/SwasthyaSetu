@@ -23,9 +23,15 @@ api.interceptors.response.use(
       if (error.response.status === 401 || error.response.status === 403) {
         console.log("Patient session expired");
 
-        localStorage.removeItem("patientToken");
-
-        window.location.href = "/";
+        const token = localStorage.getItem("patientToken");
+        // Only treat as session expiry if user was previously logged in
+        if (token) {
+          localStorage.removeItem("patientToken");
+          window.dispatchEvent(new Event("sessionExpired"));
+        } else {
+          // Not logged in — navigate to login via React Router
+          window.location.href = "/";
+        }
       }
     }
 

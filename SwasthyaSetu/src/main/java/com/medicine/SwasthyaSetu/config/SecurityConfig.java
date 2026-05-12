@@ -48,6 +48,13 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/api/hospital/**", "/api/doctor/hospital/**").permitAll()
+                        // Patients can view doctor profiles (read-only)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/doctor/*").authenticated()
+                        // Doctor appointment endpoints — require DOCTOR role
+                        .requestMatchers("/api/appointment/doctor/**").hasRole("DOCTOR")
+                        // Patient appointment endpoints — require PATIENT role
+                        .requestMatchers("/api/appointment/**").hasRole("PATIENT")
+                        // Doctor management endpoints require DOCTOR role
                         .requestMatchers("/api/doctor/**").hasRole("DOCTOR")
                         .requestMatchers("/api/patient/**").hasRole("PATIENT")
                         .anyRequest().authenticated()
