@@ -43,6 +43,8 @@ This branch starts the migration with container-ready configuration before extra
   unlock rule the UI expects.
 - Removed stale appointment-service JPA ownership of patient audit logs, medical records, and medicines; appointment-service
   now keeps only response DTOs for data returned by patient-service.
+- Added Jenkins CI/CD scaffolding with a root `Jenkinsfile`, reusable `scripts/ci/*` checks, optional Docker Compose deploy,
+  optional service-owned DB sync, and setup notes in `docs/jenkins-ci-cd.md`.
 
 ## Local Run
 
@@ -79,6 +81,5 @@ Useful URLs:
 
 ## Next Extraction Order
 
-1. Continue service-owned DB hardening and exercise the full `docker-compose.service-dbs.yml` path.
-2. Add Jenkins CI/CD.
-3. Add ELK logging and monitoring.
+1. Add ELK logging and monitoring.
+2. Add production registry publishing and remote deployment steps once Docker registry and server credentials are chosen.
