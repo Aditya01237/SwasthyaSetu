@@ -45,6 +45,8 @@ This branch starts the migration with container-ready configuration before extra
   now keeps only response DTOs for data returned by patient-service.
 - Added Jenkins CI/CD scaffolding with a root `Jenkinsfile`, reusable `scripts/ci/*` checks, optional Docker Compose deploy,
   optional service-owned DB sync, and setup notes in `docs/jenkins-ci-cd.md`.
+- Added optional ELK observability with `docker-compose.observability.yml`, Logstash GELF ingestion for service container
+  logs, Kibana/Elasticsearch local ports, and setup notes in `docs/observability-elk.md`.
 
 ## Local Run
 
@@ -64,6 +66,13 @@ docker compose -f docker-compose.yml -f docker-compose.service-dbs.yml --profile
 
 The sync command copies the existing transition data from `swasthyasetudb` into the service databases. RabbitMQ consumers now keep new patient, hospital, doctor, and appointment read-model changes flowing after that seed step.
 
+To run centralized local logging with ELK:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build -d
+sh scripts/ci/health-check-observability.sh
+```
+
 Useful URLs:
 
 - Patient frontend: `http://localhost:5173/patient/`
@@ -78,8 +87,9 @@ Useful URLs:
 - AI health: `http://localhost:8000/health`
 - RabbitMQ UI: `http://localhost:15672`
 - Local email inbox: `http://localhost:8025`
+- Kibana: `http://localhost:5601`
+- Elasticsearch health: `http://localhost:9200/_cluster/health`
 
 ## Next Extraction Order
 
-1. Add ELK logging and monitoring.
-2. Add production registry publishing and remote deployment steps once Docker registry and server credentials are chosen.
+1. Add production registry publishing and remote deployment steps once Docker registry and server credentials are chosen.

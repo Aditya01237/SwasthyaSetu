@@ -4,6 +4,8 @@ set -eu
 echo "Validating Docker Compose configuration..."
 docker compose config --quiet
 docker compose -f docker-compose.yml -f docker-compose.service-dbs.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.observability.yml config --quiet
+docker compose -f docker-compose.yml -f docker-compose.service-dbs.yml -f docker-compose.observability.yml config --quiet
 
 if command -v kubectl >/dev/null 2>&1; then
   echo "Rendering Kubernetes manifests with kubectl kustomize..."
