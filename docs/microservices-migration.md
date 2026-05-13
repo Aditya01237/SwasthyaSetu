@@ -47,6 +47,8 @@ This branch starts the migration with container-ready configuration before extra
   optional service-owned DB sync, and setup notes in `docs/jenkins-ci-cd.md`.
 - Added optional ELK observability with `docker-compose.observability.yml`, Logstash GELF ingestion for service container
   logs, Kibana/Elasticsearch local ports, and setup notes in `docs/observability-elk.md`.
+- Added production publishing/deploy scaffolding with `docker-compose.images.yml`, registry push and remote SSH deploy
+  scripts, expanded Jenkins parameters, and manual setup notes in `docs/production-deploy.md`.
 
 ## Local Run
 
@@ -92,4 +94,5 @@ Useful URLs:
 
 ## Next Extraction Order
 
-1. Add production registry publishing and remote deployment steps once Docker registry and server credentials are chosen.
+1. Add production hardening once a real environment is chosen: managed secrets, HTTPS/TLS, domain DNS, backups, and Kubernetes registry image promotion.
+2. Add an appointment slot availability API so the UI can hide booked slots from the backend source of truth instead of relying on local UI state.
