@@ -24,13 +24,13 @@ check_url() {
   return 1
 }
 
-check_url "AI service" "http://localhost:8000/health"
-check_url "Gateway" "http://localhost:8080/actuator/health"
-check_url "Auth service" "http://localhost:8081/actuator/health"
-check_url "Patient service" "http://localhost:8082/actuator/health"
-check_url "Appointment service" "http://localhost:8083/actuator/health"
-check_url "Hospital service" "http://localhost:8084/actuator/health"
-check_url "Notification service" "http://localhost:8086/actuator/health"
-check_url "Backend" "http://localhost:8090/actuator/health"
-check_url "Patient frontend" "http://localhost:5173/patient/"
-check_url "Doctor frontend" "http://localhost:5174/doctor/"
+check_url "AI service" "http://localhost:${AI_SERVICE_PORT:-8000}/health"
+check_url "Gateway" "http://localhost:${GATEWAY_PORT:-8080}/actuator/health"
+check_url "Auth service" "http://localhost:${AUTH_SERVICE_PORT:-8081}/actuator/health"
+check_url "Patient service" "http://localhost:${PATIENT_SERVICE_PORT:-8082}/actuator/health"
+check_url "Appointment service" "http://localhost:${APPOINTMENT_SERVICE_PORT:-8083}/actuator/health"
+check_url "Hospital service" "http://localhost:${HOSPITAL_SERVICE_PORT:-8084}/actuator/health"
+check_url "Notification service" "http://localhost:${NOTIFICATION_SERVICE_PORT:-8086}/actuator/health"
+check_url "Backend" "http://localhost:${BACKEND_PORT:-8090}/actuator/health"
+check_url "Patient frontend" "http://localhost:${PATIENT_FRONTEND_PORT:-5173}/patient/"
+check_url "Doctor frontend" "http://localhost:${DOCTOR_FRONTEND_PORT:-5174}/doctor/"

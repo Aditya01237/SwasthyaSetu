@@ -59,6 +59,15 @@ For normal CI, keep only `RUN_DOCKER_BUILD` enabled. For local CD testing on a J
 
 For registry publishing, enable `PUBLISH_IMAGES` and set `DOCKER_REGISTRY_CREDENTIALS_ID`. For remote deploy, also enable `RUN_REMOTE_DEPLOY` and provide the remote SSH parameters.
 
+Jenkins local deploy uses CI-only host ports so it can run beside your normal local Docker stack:
+
+- Patient frontend: `http://localhost:15173/patient/`
+- Doctor frontend: `http://localhost:15174/doctor/`
+- API gateway: `http://localhost:18080`
+- AI service: `http://localhost:18000`
+- Mailpit: `http://localhost:18025`
+- RabbitMQ management: `http://localhost:15674`
+
 ## Local Equivalent Commands
 
 ```bash
