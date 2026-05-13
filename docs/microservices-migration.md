@@ -54,6 +54,7 @@ This branch starts the migration with container-ready configuration before extra
   `scripts/ci/health-check-k8s.sh`; Jenkins can now run the Minikube deploy path with `RUN_MINIKUBE_DEPLOY`.
 - Added Ansible configuration-management deployment with `ansible/playbooks/setup-docker.yml`,
   `ansible/playbooks/deploy-compose.yml`, `scripts/ci/deploy-ansible.sh`, and Jenkins `RUN_ANSIBLE_DEPLOY`.
+- Added the Jenkins GitHub push trigger plus setup notes in `docs/github-webhook-jenkins.md`.
 
 ## Local Run
 

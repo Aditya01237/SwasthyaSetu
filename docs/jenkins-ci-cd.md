@@ -11,7 +11,7 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 - Docker with Docker Compose v2
 - Ansible optional, required only for `RUN_ANSIBLE_DEPLOY`
 - `kubectl` optional, used only to render the local Kubernetes manifests
-- Jenkins plugins: Pipeline, Git, Credentials Binding, SSH Agent, and JUnit
+- Jenkins plugins: Pipeline, Git, GitHub, Credentials Binding, SSH Agent, and JUnit
 
 ## Create the Pipeline
 
@@ -19,6 +19,7 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 2. Select Pipeline script from SCM.
 3. Use this repository URL and the `aditya-branch` branch.
 4. Set Script Path to `Jenkinsfile`.
+5. Configure the GitHub webhook using `docs/github-webhook-jenkins.md`.
 
 ## Manual Jenkins Setup
 
