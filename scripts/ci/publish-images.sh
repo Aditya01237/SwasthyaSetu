@@ -9,6 +9,7 @@ export IMAGE_REPOSITORY_PREFIX
 export IMAGE_TAG
 
 echo "Building application images with tag: ${IMAGE_REPOSITORY_PREFIX}/*:${IMAGE_TAG}"
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 docker compose -f docker-compose.yml -f docker-compose.images.yml build ${APP_IMAGE_SERVICES}
 
 echo "Pushing application images..."
