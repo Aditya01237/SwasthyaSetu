@@ -27,6 +27,11 @@ pipeline {
             defaultValue: false,
             description: 'Build and push app images to the configured Docker registry.'
         )
+        booleanParam(
+            name: 'RUN_MINIKUBE_DEPLOY',
+            defaultValue: false,
+            description: 'Deploy the stack to local Minikube after a successful build.'
+        )
         string(
             name: 'IMAGE_REPOSITORY_PREFIX',
             defaultValue: 'ghcr.io/aditya01237/swasthya-setu',
@@ -84,6 +89,8 @@ pipeline {
         COMPOSE_PROJECT_NAME = 'swasthya-setu-ci'
         COMPOSE_DOCKER_CLI_BUILD = '1'
         DOCKER_BUILDKIT = '1'
+        MINIKUBE_PROFILE = 'minikube'
+        K8S_NAMESPACE = 'swasthya-setu'
         POSTGRES_PORT = '15433'
         REDIS_PORT = '16379'
         RABBITMQ_PORT = '15673'
@@ -198,7 +205,7 @@ pipeline {
 
         stage('Build Docker Images') {
             when {
-                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES }
+                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES && !params.RUN_MINIKUBE_DEPLOY }
             }
             steps {
                 sh 'docker compose build'
@@ -249,6 +256,15 @@ pipeline {
             }
             steps {
                 sh 'sh scripts/ci/deploy-compose.sh'
+            }
+        }
+
+        stage('Deploy Minikube') {
+            when {
+                expression { params.RUN_MINIKUBE_DEPLOY }
+            }
+            steps {
+                sh 'sh scripts/ci/deploy-minikube.sh'
             }
         }
 

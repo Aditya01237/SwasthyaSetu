@@ -49,6 +49,8 @@ This branch starts the migration with container-ready configuration before extra
   logs, Kibana/Elasticsearch local ports, and setup notes in `docs/observability-elk.md`.
 - Added production publishing/deploy scaffolding with `docker-compose.images.yml`, registry push and remote SSH deploy
   scripts, expanded Jenkins parameters, and manual setup notes in `docs/production-deploy.md`.
+- Added scripted Minikube deployment and Kubernetes health checks through `scripts/ci/deploy-minikube.sh` and
+  `scripts/ci/health-check-k8s.sh`; Jenkins can now run the Minikube deploy path with `RUN_MINIKUBE_DEPLOY`.
 
 ## Local Run
 
@@ -75,6 +77,12 @@ docker compose -f docker-compose.yml -f docker-compose.observability.yml up --bu
 sh scripts/ci/health-check-observability.sh
 ```
 
+To deploy into Minikube:
+
+```bash
+sh scripts/ci/deploy-minikube.sh
+```
+
 Useful URLs:
 
 - Patient frontend: `http://localhost:5173/patient/`
@@ -95,4 +103,5 @@ Useful URLs:
 ## Next Extraction Order
 
 1. Add production hardening once a real environment is chosen: managed secrets, HTTPS/TLS, domain DNS, backups, and Kubernetes registry image promotion.
-2. Add an appointment slot availability API so the UI can hide booked slots from the backend source of truth instead of relying on local UI state.
+2. Add Kubernetes observability manifests or Helm values for ELK/Prometheus once the target cluster shape is chosen.
+3. Add an appointment slot availability API so the UI can hide booked slots from the backend source of truth instead of relying on local UI state.

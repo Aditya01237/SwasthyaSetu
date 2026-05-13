@@ -12,13 +12,23 @@ Local Minikube setup for the extracted services.
 
 ## Run Locally
 
+Recommended scripted flow:
+
+```bash
+sh scripts/ci/deploy-minikube.sh
+```
+
+That script starts Minikube if needed, enables the ingress addon, builds app images inside Minikube's Docker daemon, applies `k8s/`, waits for rollouts, and runs service health checks through temporary port-forwards.
+
+Manual equivalent:
+
 ```bash
 minikube start
 minikube addons enable ingress
 eval $(minikube docker-env)
 docker compose build
 kubectl apply -k k8s
-kubectl -n swasthya-setu get pods
+sh scripts/ci/health-check-k8s.sh
 ```
 
 Map the Minikube IP:
@@ -32,6 +42,13 @@ Useful URLs:
 - Patient frontend: `http://swasthya.local/patient/`
 - Doctor frontend: `http://swasthya.local/doctor/`
 - API gateway health: `http://swasthya.local/api/actuator/health`
+
+The health-check script also opens temporary local ports:
+
+- Patient frontend: `http://localhost:25173/patient/`
+- Doctor frontend: `http://localhost:25174/doctor/`
+- API gateway: `http://localhost:28080/actuator/health`
+- AI service: `http://localhost:28000/health`
 
 For local email inspection:
 

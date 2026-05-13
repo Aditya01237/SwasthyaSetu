@@ -44,6 +44,7 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 - `RUN_LOCAL_DEPLOY`: runs Docker Compose on the Jenkins host after a successful build.
 - `RUN_SERVICE_DB_SYNC`: deploys with `docker-compose.service-dbs.yml` and seeds `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
 - `PUBLISH_IMAGES`: builds and pushes app/frontend images to a registry using `docker-compose.images.yml`.
+- `RUN_MINIKUBE_DEPLOY`: builds images inside Minikube, applies `k8s/`, and runs Kubernetes rollout/health checks.
 - `IMAGE_REPOSITORY_PREFIX`: image prefix, for example `ghcr.io/aditya01237/swasthya-setu`.
 - `IMAGE_TAG`: image tag. Leave blank to use the Git commit SHA.
 - `DOCKER_REGISTRY_URL`: registry login host, for example `ghcr.io` or `docker.io`.
@@ -58,6 +59,8 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 For normal CI, keep only `RUN_DOCKER_BUILD` enabled. For local CD testing on a Jenkins machine with Docker, enable `RUN_LOCAL_DEPLOY`. Enable `RUN_SERVICE_DB_SYNC` when you specifically want to test the service-owned database path.
 
 For registry publishing, enable `PUBLISH_IMAGES` and set `DOCKER_REGISTRY_CREDENTIALS_ID`. For remote deploy, also enable `RUN_REMOTE_DEPLOY` and provide the remote SSH parameters.
+
+For Minikube CD testing, enable `RUN_MINIKUBE_DEPLOY`. The Jenkins agent must have Docker, Minikube, and kubectl access.
 
 Jenkins local deploy uses CI-only host ports so it can run beside your normal local Docker stack:
 
@@ -94,6 +97,12 @@ For split database deploy and seed:
 
 ```bash
 RUN_SERVICE_DB_SYNC=true sh scripts/ci/deploy-compose.sh
+```
+
+For Minikube deploy:
+
+```bash
+sh scripts/ci/deploy-minikube.sh
 ```
 
 For remote deploy after images have been pushed:
