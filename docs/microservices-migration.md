@@ -57,6 +57,8 @@ This branch starts the migration with container-ready configuration before extra
 - Added the Jenkins GitHub push trigger plus setup notes in `docs/github-webhook-jenkins.md`.
 - Added Docker Hub image deployment for Kubernetes with `scripts/ci/render-k8s-registry.sh`,
   `scripts/ci/deploy-k8s-registry.sh`, and Jenkins `RUN_K8S_REGISTRY_DEPLOY`.
+- Added repeatable ELK evidence scripts with `scripts/ci/check-elk-observability.sh` and
+  `scripts/ci/smoke-elk-log.sh` to prove GELF logs reach Elasticsearch/Kibana.
 
 ## Local Run
 
