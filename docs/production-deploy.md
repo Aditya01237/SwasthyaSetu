@@ -17,16 +17,16 @@ This phase adds registry publishing, optional remote Docker Compose deployment, 
 ## Manual Steps You Must Do Once
 
 1. Choose a registry:
-   - Recommended for GitHub projects: GitHub Container Registry.
-   - Registry URL: `ghcr.io`.
-   - Image prefix example: `ghcr.io/aditya01237/swasthya-setu`.
+   - Required for the final project demo: Docker Hub.
+   - Registry URL: `docker.io`.
+   - Image prefix example: `docker.io/adityapareek01`.
 2. Create a registry token:
-   - For GHCR, create a GitHub token with package write access.
+   - For Docker Hub, create a Docker Hub access token.
    - Use that token as the password in Jenkins.
 3. Add Jenkins registry credentials:
    - Manage Jenkins -> Credentials -> System -> Global credentials -> Add Credentials.
    - Kind: Username with password.
-   - ID: `swasthya-registry`.
+   - ID: `swasthya-dockerhub`.
 4. Create the Jenkins Pipeline job:
    - New Item -> Pipeline.
    - Pipeline definition: Pipeline script from SCM.
@@ -54,10 +54,10 @@ This phase adds registry publishing, optional remote Docker Compose deployment, 
 
 - `RUN_DOCKER_BUILD`: false
 - `PUBLISH_IMAGES`: true
-- `IMAGE_REPOSITORY_PREFIX`: `ghcr.io/aditya01237/swasthya-setu`
+- `IMAGE_REPOSITORY_PREFIX`: `docker.io/adityapareek01`
 - `IMAGE_TAG`: leave empty for Git SHA, or use a release name like `phase-cd-1`
-- `DOCKER_REGISTRY_URL`: `ghcr.io`
-- `DOCKER_REGISTRY_CREDENTIALS_ID`: `swasthya-registry`
+- `DOCKER_REGISTRY_URL`: `docker.io`
+- `DOCKER_REGISTRY_CREDENTIALS_ID`: `swasthya-dockerhub`
 - `RUN_LOCAL_DEPLOY`: false
 - `RUN_REMOTE_DEPLOY`: false
 

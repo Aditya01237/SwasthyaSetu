@@ -6,7 +6,7 @@ compose_project_name: swasthya-setu
 run_service_db_sync: false
 docker_compose_become: false
 
-image_repository_prefix: ghcr.io/aditya01237/swasthya-setu
+image_repository_prefix: docker.io/adityapareek01
 image_tag: local
 
 registry_url: "{{ lookup('env', 'DOCKER_REGISTRY_URL') | default('', true) }}"

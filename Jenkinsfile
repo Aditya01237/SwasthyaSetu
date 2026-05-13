@@ -44,8 +44,8 @@ pipeline {
         )
         string(
             name: 'IMAGE_REPOSITORY_PREFIX',
-            defaultValue: 'ghcr.io/aditya01237/swasthya-setu',
-            description: 'Registry/repository prefix, for example ghcr.io/user/project or docker.io/user.'
+            defaultValue: 'docker.io/adityapareek01',
+            description: 'Registry namespace prefix, for example docker.io/user.'
         )
         string(
             name: 'IMAGE_TAG',
@@ -54,8 +54,8 @@ pipeline {
         )
         string(
             name: 'DOCKER_REGISTRY_URL',
-            defaultValue: 'ghcr.io',
-            description: 'Registry host used for docker login, for example ghcr.io or docker.io.'
+            defaultValue: 'docker.io',
+            description: 'Registry host used for docker login, for Docker Hub use docker.io.'
         )
         string(
             name: 'DOCKER_REGISTRY_CREDENTIALS_ID',

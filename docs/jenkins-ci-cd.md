@@ -26,9 +26,9 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 
 1. Docker registry credentials:
    - Kind: Username with password.
-   - ID example: `swasthya-registry`.
-   - Username: your registry username.
-   - Password: a registry access token or password.
+   - ID example: `swasthya-dockerhub`.
+   - Username: your Docker Hub username.
+   - Password: a Docker Hub access token.
 2. Remote SSH credentials, only if using remote deploy:
    - Kind: SSH Username with private key.
    - ID example: `swasthya-deploy-ssh`.
@@ -52,9 +52,9 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 - `RUN_MINIKUBE_DEPLOY`: builds images inside Minikube, applies `k8s/`, and runs Kubernetes rollout/health checks.
 - `RUN_ANSIBLE_DEPLOY`: deploys published images to a remote Docker host with Ansible.
 - `ANSIBLE_SETUP_DOCKER`: installs and starts Docker on the target before Ansible deployment.
-- `IMAGE_REPOSITORY_PREFIX`: image prefix, for example `ghcr.io/aditya01237/swasthya-setu`.
+- `IMAGE_REPOSITORY_PREFIX`: image prefix, for example `docker.io/adityapareek01`.
 - `IMAGE_TAG`: image tag. Leave blank to use the Git commit SHA.
-- `DOCKER_REGISTRY_URL`: registry login host, for example `ghcr.io` or `docker.io`.
+- `DOCKER_REGISTRY_URL`: registry login host. Use `docker.io` for Docker Hub.
 - `DOCKER_REGISTRY_CREDENTIALS_ID`: Jenkins credentials ID for registry login.
 - `RUN_REMOTE_DEPLOY`: deploys the pushed images to a remote Docker host over SSH.
 - `REMOTE_DEPLOY_HOST`: remote server hostname or IP.
@@ -95,7 +95,7 @@ docker compose build
 For image publishing:
 
 ```bash
-IMAGE_REPOSITORY_PREFIX=ghcr.io/aditya01237/swasthya-setu IMAGE_TAG=local sh scripts/ci/publish-images.sh
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 IMAGE_TAG=local sh scripts/ci/publish-images.sh
 ```
 
 For a local deploy:
@@ -119,7 +119,7 @@ sh scripts/ci/deploy-minikube.sh
 For remote deploy after images have been pushed:
 
 ```bash
-IMAGE_REPOSITORY_PREFIX=ghcr.io/aditya01237/swasthya-setu \
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
 IMAGE_TAG=local \
 REMOTE_DEPLOY_HOST=your-server.example.com \
 REMOTE_DEPLOY_USER=deploy \
@@ -131,8 +131,10 @@ For Ansible deploy after images have been pushed:
 
 ```bash
 ANSIBLE_INVENTORY=ansible/inventory.example.ini \
-IMAGE_REPOSITORY_PREFIX=ghcr.io/aditya01237/swasthya-setu \
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
 IMAGE_TAG=local \
 REMOTE_DEPLOY_PATH=swasthya-setu \
 sh scripts/ci/deploy-ansible.sh
 ```
+
+See `docs/dockerhub-setup.md` for the exact Docker Hub account/token and Jenkins credential steps.

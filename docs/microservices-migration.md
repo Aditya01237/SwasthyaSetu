@@ -49,6 +49,7 @@ This branch starts the migration with container-ready configuration before extra
   logs, Kibana/Elasticsearch local ports, and setup notes in `docs/observability-elk.md`.
 - Added production publishing/deploy scaffolding with `docker-compose.images.yml`, registry push and remote SSH deploy
   scripts, expanded Jenkins parameters, and manual setup notes in `docs/production-deploy.md`.
+- Aligned image publishing defaults and setup notes with Docker Hub for the final project requirement.
 - Added scripted Minikube deployment and Kubernetes health checks through `scripts/ci/deploy-minikube.sh` and
   `scripts/ci/health-check-k8s.sh`; Jenkins can now run the Minikube deploy path with `RUN_MINIKUBE_DEPLOY`.
 - Added Ansible configuration-management deployment with `ansible/playbooks/setup-docker.yml`,
@@ -89,7 +90,7 @@ To deploy published images with Ansible:
 
 ```bash
 ANSIBLE_INVENTORY=ansible/inventory.example.ini \
-IMAGE_REPOSITORY_PREFIX=ghcr.io/aditya01237/swasthya-setu \
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
 IMAGE_TAG=local \
 sh scripts/ci/deploy-ansible.sh
 ```

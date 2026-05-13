@@ -2,31 +2,31 @@ name: swasthya-setu
 
 services:
   ai-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/ai-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-ai-service:${IMAGE_TAG:-local}
 
   backend:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/backend:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-backend:${IMAGE_TAG:-local}
 
   auth-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/auth-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-auth-service:${IMAGE_TAG:-local}
 
   hospital-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/hospital-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-hospital-service:${IMAGE_TAG:-local}
 
   appointment-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/appointment-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-appointment-service:${IMAGE_TAG:-local}
 
   patient-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/patient-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-patient-service:${IMAGE_TAG:-local}
 
   notification-service:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/notification-service:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-notification-service:${IMAGE_TAG:-local}
 
   api-gateway:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/api-gateway:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-api-gateway:${IMAGE_TAG:-local}
 
   swasthya-frontend:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/swasthya-frontend:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-patient-frontend:${IMAGE_TAG:-local}
 
   doctor-frontend:
-    image: ${IMAGE_REPOSITORY_PREFIX:-ghcr.io/aditya01237/swasthya-setu}/doctor-frontend:${IMAGE_TAG:-local}
+    image: ${IMAGE_REPOSITORY_PREFIX:-docker.io/adityapareek01}/swasthya-setu-doctor-frontend:${IMAGE_TAG:-local}

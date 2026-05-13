@@ -19,7 +19,7 @@ This folder adds the configuration-management phase required by the final projec
 
 ```bash
 ANSIBLE_INVENTORY=ansible/inventory.example.ini \
-IMAGE_REPOSITORY_PREFIX=ghcr.io/aditya01237/swasthya-setu \
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
 IMAGE_TAG=your-image-tag \
 sh scripts/ci/deploy-ansible.sh
 ```
