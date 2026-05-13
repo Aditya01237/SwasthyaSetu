@@ -80,6 +80,7 @@ pipeline {
     }
 
     environment {
+        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
         COMPOSE_PROJECT_NAME = 'swasthya-setu-ci'
         COMPOSE_DOCKER_CLI_BUILD = '1'
         DOCKER_BUILDKIT = '1'
