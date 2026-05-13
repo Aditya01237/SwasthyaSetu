@@ -32,6 +32,10 @@ public class AuditLog {
     @JoinColumn(name = "patient_id")
     private Patient patient;
 
+    @ManyToOne
+    @JoinColumn(name = "appointment_id")
+    private Appointment appointment;
+
     private String action;
     private LocalDateTime timestamp;
 }

@@ -118,6 +118,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+      PATIENT_SERVICE_URL: http://patient-service:8082
       JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
     ports:
       - "${AUTH_SERVICE_PORT:-8081}:8081"
@@ -179,6 +180,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      patient-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]

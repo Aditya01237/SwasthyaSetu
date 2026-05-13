@@ -9,13 +9,16 @@ import com.medicine.patient.dto.PatientInfoDto;
 import com.medicine.patient.dto.PatientRegisterRequest;
 import com.medicine.patient.dto.PatientResponse;
 import com.medicine.patient.dto.PrescriptionResponse;
+import com.medicine.patient.dto.QrAccessResponse;
 import com.medicine.patient.entity.Appointment;
 import com.medicine.patient.entity.AuditLog;
+import com.medicine.patient.entity.Doctor;
 import com.medicine.patient.entity.MedicalRecord;
 import com.medicine.patient.entity.Medicine;
 import com.medicine.patient.entity.Patient;
 import com.medicine.patient.repository.AppointmentRepository;
 import com.medicine.patient.repository.AuditLogRepository;
+import com.medicine.patient.repository.DoctorRepository;
 import com.medicine.patient.repository.MedicalRecordRepository;
 import com.medicine.patient.repository.PatientRepository;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class PatientService {
@@ -33,6 +37,7 @@ public class PatientService {
     private final MedicalRecordRepository medicalRecordRepository;
     private final AppointmentRepository appointmentRepository;
     private final AuditLogRepository auditLogRepository;
+    private final DoctorRepository doctorRepository;
     private final AiClient aiClient;
     private final PatientEventPublisher patientEventPublisher;
 
@@ -40,12 +45,14 @@ public class PatientService {
                           MedicalRecordRepository medicalRecordRepository,
                           AppointmentRepository appointmentRepository,
                           AuditLogRepository auditLogRepository,
+                          DoctorRepository doctorRepository,
                           AiClient aiClient,
                           PatientEventPublisher patientEventPublisher) {
         this.patientRepository = patientRepository;
         this.medicalRecordRepository = medicalRecordRepository;
         this.appointmentRepository = appointmentRepository;
         this.auditLogRepository = auditLogRepository;
+        this.doctorRepository = doctorRepository;
         this.aiClient = aiClient;
         this.patientEventPublisher = patientEventPublisher;
     }
@@ -115,6 +122,10 @@ public class PatientService {
             throw new RuntimeException("Unauthorized appointment access");
         }
 
+        if (!auditLogRepository.existsByPatientIdAndAppointmentIdAndAction(patient.getId(), appointmentId, "QR_SCAN")) {
+            throw new RuntimeException("Prescription upload locked until QR is scanned");
+        }
+
         medicalRecordRepository.findByAppointmentId(appointmentId).ifPresent(record -> {
             throw new RuntimeException("Prescription already uploaded for this appointment");
         });
@@ -141,6 +152,45 @@ public class PatientService {
 
         record.setMedicines(medicines);
         return toMedicalRecordDTO(medicalRecordRepository.save(record));
+    }
+
+    @Transactional
+    public QrAccessResponse recordQrAccess(Long patientId, Long appointmentId, Long doctorId) {
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+
+        if (appointment.getPatient() == null || !Objects.equals(appointment.getPatient().getId(), patient.getId())) {
+            throw new RuntimeException("Unauthorized appointment access");
+        }
+
+        AuditLog auditLog = new AuditLog();
+        auditLog.setDoctor(doctor);
+        auditLog.setPatient(patient);
+        auditLog.setAppointment(appointment);
+        auditLog.setAction("QR_SCAN");
+        auditLog.setTimestamp(LocalDateTime.now());
+        auditLogRepository.save(auditLog);
+
+        QrAccessResponse response = new QrAccessResponse();
+        response.setStatus("SUCCESS");
+        response.setMessage("Access Granted");
+        response.setRecords(
+                medicalRecordRepository.findByPatientId(patient.getId())
+                        .stream()
+                        .map(this::toMedicalRecordDTO)
+                        .toList()
+        );
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<MedicalRecordDTO> getMedicalRecordForAppointment(Long appointmentId) {
+        return medicalRecordRepository.findByAppointmentId(appointmentId)
+                .map(this::toMedicalRecordDTO);
     }
 
     private PatientResponse toPatientResponse(Patient patient) {

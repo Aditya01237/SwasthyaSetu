@@ -152,10 +152,7 @@ sync_database "$APPOINTMENT_DB" \
   doctors \
   patients \
   appointments \
-  qr_tokens \
-  audit_logs \
-  medical_records \
-  medicines
+  qr_tokens
 
 sync_database "$PATIENT_DB" \
   hospitals \

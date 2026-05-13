@@ -6,8 +6,6 @@ import com.medicine.appointment.dto.AppointmentListResponse;
 import com.medicine.appointment.dto.AppointmentRequest;
 import com.medicine.appointment.dto.AppointmentResponse;
 import com.medicine.appointment.dto.DoctorAppointmentListResponse;
-import com.medicine.appointment.dto.MedicalRecordDTO;
-import com.medicine.appointment.dto.MedicineDto;
 import com.medicine.appointment.entity.Appointment;
 import com.medicine.appointment.entity.Doctor;
 import com.medicine.appointment.entity.Hospital;
@@ -16,7 +14,6 @@ import com.medicine.appointment.entity.QRToken;
 import com.medicine.appointment.repository.AppointmentRepository;
 import com.medicine.appointment.repository.DoctorRepository;
 import com.medicine.appointment.repository.HospitalRepository;
-import com.medicine.appointment.repository.MedicalRecordRepository;
 import com.medicine.appointment.repository.PatientRepository;
 import com.medicine.appointment.repository.QrTokenRepository;
 import jakarta.transaction.Transactional;
@@ -40,8 +37,8 @@ public class AppointmentService {
     private final QrTokenRepository qrTokenRepository;
     private final DoctorRepository doctorRepository;
     private final AppointmentEventPublisher appointmentEventPublisher;
-    private final MedicalRecordRepository medicalRecordRepository;
     private final SlotLockService slotLockService;
+    private final PatientClinicalClient patientClinicalClient;
 
     public AppointmentService(PatientRepository patientRepository,
                               HospitalRepository hospitalRepository,
@@ -49,16 +46,16 @@ public class AppointmentService {
                               QrTokenRepository qrTokenRepository,
                               DoctorRepository doctorRepository,
                               AppointmentEventPublisher appointmentEventPublisher,
-                              MedicalRecordRepository medicalRecordRepository,
-                              SlotLockService slotLockService) {
+                              SlotLockService slotLockService,
+                              PatientClinicalClient patientClinicalClient) {
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
         this.appointmentRepository = appointmentRepository;
         this.qrTokenRepository = qrTokenRepository;
         this.doctorRepository = doctorRepository;
         this.appointmentEventPublisher = appointmentEventPublisher;
-        this.medicalRecordRepository = medicalRecordRepository;
         this.slotLockService = slotLockService;
+        this.patientClinicalClient = patientClinicalClient;
     }
 
     @Transactional
@@ -151,8 +148,8 @@ public class AppointmentService {
         response.setValidTo(qr.getValidTo());
         response.setIsValid(qr.isUsed());
 
-        medicalRecordRepository.findByAppointmentId(id)
-                .ifPresent(record -> response.setMedicalRecord(toMedicalRecordDTO(record)));
+        patientClinicalClient.getMedicalRecordForAppointment(id)
+                .ifPresent(response::setMedicalRecord);
 
         return response;
     }
@@ -210,17 +207,4 @@ public class AppointmentService {
                 .toList();
     }
 
-    private MedicalRecordDTO toMedicalRecordDTO(com.medicine.appointment.entity.MedicalRecord record) {
-        MedicalRecordDTO dto = new MedicalRecordDTO();
-        dto.setDiagnosis(record.getDiagnosis());
-        dto.setRecordDate(record.getRecordDate());
-        dto.setMedicines(record.getMedicines().stream().map(medicine -> {
-            MedicineDto medicineDto = new MedicineDto();
-            medicineDto.setName(medicine.getName());
-            medicineDto.setDosage(medicine.getDosage());
-            medicineDto.setFrequency(medicine.getFrequency());
-            return medicineDto;
-        }).toList());
-        return dto;
-    }
 }

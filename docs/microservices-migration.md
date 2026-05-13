@@ -33,10 +33,16 @@ This branch starts the migration with container-ready configuration before extra
 - Added `notification-service` on port `8086` with RabbitMQ consumers for `appointment.booked`, `patient.registered`, and `auth.otp-requested`. Appointment confirmation email now publishes from `appointment-service`; patient welcome email publishes from `patient-service`; OTP email publishes from `auth-service`.
 - Added local Kubernetes manifests under `k8s/` for Minikube: app Deployments, ClusterIP Services, NGINX Ingress, PostgreSQL StatefulSet with PVC, Redis, RabbitMQ, and Mailpit.
 - Added service-owned database wiring. Normal Docker Compose still uses the shared transition DB so the app stays stable; `docker-compose.service-dbs.yml` switches auth, patient, appointment, and hospital services to `auth_db`, `patient_db`, `appointment_db`, and `hospital_db` for split-DB testing.
-- Added `docker/postgres/sync-service-databases.sh` to copy existing transition data into service-owned databases after service schemas have been created.
+- Added `docker/postgres/sync-service-databases.sh` to copy existing transition data into service-owned databases after service schemas have been created; appointment DB seeding now excludes patient clinical tables.
 - Added RabbitMQ read-model sync consumers so services can update their own local copies from domain events:
   `patient.registered`, `hospital.upserted`, `doctor.registered`, and `appointment.booked`.
 - Expanded event payloads with the IDs and display fields needed for service-owned DB mode. Auth, appointment, patient, and hospital services now declare their own consumer queues for the data they need.
+- Started service-to-service boundary cleanup: QR scans and appointment-detail medical-record reads in `appointment-service`
+  now call internal `patient-service` endpoints instead of writing/reading patient-owned data directly.
+- Patient prescription upload now requires an appointment-specific QR scan audit entry, so the backend enforces the same
+  unlock rule the UI expects.
+- Removed stale appointment-service JPA ownership of patient audit logs, medical records, and medicines; appointment-service
+  now keeps only response DTOs for data returned by patient-service.
 
 ## Local Run
 
@@ -73,6 +79,6 @@ Useful URLs:
 
 ## Next Extraction Order
 
-1. Add service-to-service APIs for any live reads that should not rely on copied read models, then tighten QR and medical-record ownership boundaries.
+1. Continue service-owned DB hardening and exercise the full `docker-compose.service-dbs.yml` path.
 2. Add Jenkins CI/CD.
 3. Add ELK logging and monitoring.
