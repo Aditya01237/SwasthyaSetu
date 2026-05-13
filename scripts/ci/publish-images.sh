@@ -13,6 +13,9 @@ export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 docker compose -f docker-compose.yml -f docker-compose.images.yml build ${APP_IMAGE_SERVICES}
 
 echo "Pushing application images..."
-docker compose -f docker-compose.yml -f docker-compose.images.yml push ${APP_IMAGE_SERVICES}
+for service in ${APP_IMAGE_SERVICES}; do
+  echo "Pushing ${service}..."
+  docker compose -f docker-compose.yml -f docker-compose.images.yml push "${service}"
+done
 
 echo "Published application images with tag: ${IMAGE_TAG}"
