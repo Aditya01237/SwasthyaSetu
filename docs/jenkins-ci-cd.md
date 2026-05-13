@@ -51,6 +51,7 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 - `RUN_SERVICE_DB_SYNC`: deploys with `docker-compose.service-dbs.yml` and seeds `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
 - `PUBLISH_IMAGES`: builds and pushes app/frontend images to a registry using `docker-compose.images.yml`.
 - `RUN_MINIKUBE_DEPLOY`: builds images inside Minikube, applies `k8s/`, and runs Kubernetes rollout/health checks.
+- `RUN_K8S_REGISTRY_DEPLOY`: deploys the just-published Docker Hub images to the configured Kubernetes context.
 - `RUN_ANSIBLE_DEPLOY`: deploys published images to a remote Docker host with Ansible.
 - `ANSIBLE_SETUP_DOCKER`: installs and starts Docker on the target before Ansible deployment.
 - `IMAGE_REPOSITORY_PREFIX`: image prefix, for example `docker.io/adityapareek01`.
@@ -73,6 +74,8 @@ For registry publishing, enable `PUBLISH_IMAGES` and set `DOCKER_REGISTRY_CREDEN
 For Ansible deploy, enable `PUBLISH_IMAGES` and `RUN_ANSIBLE_DEPLOY`, provide `REMOTE_SSH_CREDENTIALS_ID`, and provide either `ANSIBLE_INVENTORY_PATH` or `ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID`.
 
 For Minikube CD testing, enable `RUN_MINIKUBE_DEPLOY`. The Jenkins agent must have Docker, Minikube, and kubectl access.
+
+For Kubernetes deployment from Docker Hub, enable `PUBLISH_IMAGES` and `RUN_K8S_REGISTRY_DEPLOY`. The Jenkins agent must have `kubectl` configured for the target cluster.
 
 Jenkins local deploy uses CI-only host ports so it can run beside your normal local Docker stack:
 
@@ -115,6 +118,14 @@ For Minikube deploy:
 
 ```bash
 sh scripts/ci/deploy-minikube.sh
+```
+
+For Kubernetes deploy from Docker Hub images:
+
+```bash
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
+IMAGE_TAG=local \
+sh scripts/ci/deploy-k8s-registry.sh
 ```
 
 For remote deploy after images have been pushed:

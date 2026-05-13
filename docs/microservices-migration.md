@@ -55,6 +55,8 @@ This branch starts the migration with container-ready configuration before extra
 - Added Ansible configuration-management deployment with `ansible/playbooks/setup-docker.yml`,
   `ansible/playbooks/deploy-compose.yml`, `scripts/ci/deploy-ansible.sh`, and Jenkins `RUN_ANSIBLE_DEPLOY`.
 - Added the Jenkins GitHub push trigger plus setup notes in `docs/github-webhook-jenkins.md`.
+- Added Docker Hub image deployment for Kubernetes with `scripts/ci/render-k8s-registry.sh`,
+  `scripts/ci/deploy-k8s-registry.sh`, and Jenkins `RUN_K8S_REGISTRY_DEPLOY`.
 
 ## Local Run
 

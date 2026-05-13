@@ -20,6 +20,16 @@ sh scripts/ci/deploy-minikube.sh
 
 That script starts Minikube if needed, enables the ingress addon, builds app images inside Minikube's Docker daemon, applies `k8s/`, waits for rollouts, and runs service health checks through temporary port-forwards.
 
+To deploy images that Jenkins already pushed to Docker Hub:
+
+```bash
+IMAGE_REPOSITORY_PREFIX=docker.io/adityapareek01 \
+IMAGE_TAG=your-image-tag \
+sh scripts/ci/deploy-k8s-registry.sh
+```
+
+This keeps the base manifests local-friendly while rendering registry image names such as `docker.io/adityapareek01/swasthya-setu-auth-service:your-image-tag` at deploy time.
+
 Manual equivalent:
 
 ```bash

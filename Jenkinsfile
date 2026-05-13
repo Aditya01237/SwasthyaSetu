@@ -37,6 +37,11 @@ pipeline {
             description: 'Deploy the stack to local Minikube after a successful build.'
         )
         booleanParam(
+            name: 'RUN_K8S_REGISTRY_DEPLOY',
+            defaultValue: false,
+            description: 'Deploy published registry images to the configured Kubernetes context.'
+        )
+        booleanParam(
             name: 'RUN_ANSIBLE_DEPLOY',
             defaultValue: false,
             description: 'Deploy published images to a remote Docker host with Ansible.'
@@ -229,7 +234,7 @@ pipeline {
 
         stage('Build Docker Images') {
             when {
-                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES && !params.RUN_MINIKUBE_DEPLOY && !params.RUN_ANSIBLE_DEPLOY }
+                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES && !params.RUN_MINIKUBE_DEPLOY && !params.RUN_K8S_REGISTRY_DEPLOY && !params.RUN_ANSIBLE_DEPLOY }
             }
             steps {
                 sh 'docker compose build'
@@ -289,6 +294,33 @@ pipeline {
             }
             steps {
                 sh 'sh scripts/ci/deploy-minikube.sh'
+            }
+        }
+
+        stage('Deploy Kubernetes Registry Images') {
+            when {
+                expression { params.RUN_K8S_REGISTRY_DEPLOY }
+            }
+            steps {
+                script {
+                    if (!params.PUBLISH_IMAGES) {
+                        error 'RUN_K8S_REGISTRY_DEPLOY requires PUBLISH_IMAGES so Kubernetes can pull the images built by this pipeline.'
+                    }
+                    if (params.RUN_MINIKUBE_DEPLOY) {
+                        error 'Choose either RUN_MINIKUBE_DEPLOY or RUN_K8S_REGISTRY_DEPLOY, not both.'
+                    }
+
+                    def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
+
+                    withEnv([
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "K8S_NAMESPACE=${env.K8S_NAMESPACE}"
+                    ]) {
+                        sh 'sh scripts/ci/deploy-k8s-registry.sh'
+                    }
+                }
             }
         }
 

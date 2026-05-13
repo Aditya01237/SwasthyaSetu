@@ -47,6 +47,9 @@ For the Docker Hub publish demo run:
 - `RUN_REMOTE_DEPLOY=false`
 - `RUN_ANSIBLE_DEPLOY=false`
 - `RUN_MINIKUBE_DEPLOY=false`
+- `RUN_K8S_REGISTRY_DEPLOY=false`
+
+For a Kubernetes deploy from the images that were just pushed, set `RUN_K8S_REGISTRY_DEPLOY=true` and keep `PUBLISH_IMAGES=true`. Jenkins must have `kubectl` configured for the target cluster.
 
 ## Local Equivalent
 
