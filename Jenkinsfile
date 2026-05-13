@@ -32,6 +32,16 @@ pipeline {
             defaultValue: false,
             description: 'Deploy the stack to local Minikube after a successful build.'
         )
+        booleanParam(
+            name: 'RUN_ANSIBLE_DEPLOY',
+            defaultValue: false,
+            description: 'Deploy published images to a remote Docker host with Ansible.'
+        )
+        booleanParam(
+            name: 'ANSIBLE_SETUP_DOCKER',
+            defaultValue: true,
+            description: 'When using Ansible deploy, install/start Docker on the remote host before deployment.'
+        )
         string(
             name: 'IMAGE_REPOSITORY_PREFIX',
             defaultValue: 'ghcr.io/aditya01237/swasthya-setu',
@@ -81,6 +91,16 @@ pipeline {
             name: 'REMOTE_ENV_FILE_CREDENTIALS_ID',
             defaultValue: '',
             description: 'Optional Jenkins secret file credentials ID for the remote .env file.'
+        )
+        string(
+            name: 'ANSIBLE_INVENTORY_PATH',
+            defaultValue: 'ansible/inventory.example.ini',
+            description: 'Inventory path for Ansible deploy when no secret inventory file is provided.'
+        )
+        string(
+            name: 'ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID',
+            defaultValue: '',
+            description: 'Optional Jenkins secret file credentials ID for the Ansible inventory.'
         )
     }
 
@@ -205,7 +225,7 @@ pipeline {
 
         stage('Build Docker Images') {
             when {
-                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES && !params.RUN_MINIKUBE_DEPLOY }
+                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES && !params.RUN_MINIKUBE_DEPLOY && !params.RUN_ANSIBLE_DEPLOY }
             }
             steps {
                 sh 'docker compose build'
@@ -311,6 +331,73 @@ pipeline {
                         } else {
                             withEnv(remoteEnv) {
                                 sh 'sh scripts/ci/deploy-remote-compose.sh'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy With Ansible') {
+            when {
+                expression { params.RUN_ANSIBLE_DEPLOY }
+            }
+            steps {
+                script {
+                    if (!params.PUBLISH_IMAGES) {
+                        error 'RUN_ANSIBLE_DEPLOY requires PUBLISH_IMAGES so Ansible can pull immutable images.'
+                    }
+                    if (params.RUN_REMOTE_DEPLOY) {
+                        error 'Choose either RUN_REMOTE_DEPLOY or RUN_ANSIBLE_DEPLOY, not both.'
+                    }
+                    if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
+                        error 'REMOTE_SSH_CREDENTIALS_ID is required when RUN_ANSIBLE_DEPLOY is true.'
+                    }
+                    if (!params.ANSIBLE_INVENTORY_PATH?.trim() && !params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                        error 'ANSIBLE_INVENTORY_PATH or ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID is required when RUN_ANSIBLE_DEPLOY is true.'
+                    }
+
+                    def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
+                    def ansibleEnv = [
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "RUN_SERVICE_DB_SYNC=${params.RUN_SERVICE_DB_SYNC}",
+                        "REMOTE_DEPLOY_PATH=${params.REMOTE_DEPLOY_PATH.trim()}",
+                        "ANSIBLE_SETUP_DOCKER=${params.ANSIBLE_SETUP_DOCKER}",
+                        "DOCKER_REGISTRY_URL=${params.DOCKER_REGISTRY_URL.trim()}"
+                    ]
+
+                    sshagent(credentials: [params.REMOTE_SSH_CREDENTIALS_ID.trim()]) {
+                        withCredentials([usernamePassword(
+                            credentialsId: params.DOCKER_REGISTRY_CREDENTIALS_ID.trim(),
+                            usernameVariable: 'REGISTRY_USERNAME',
+                            passwordVariable: 'REGISTRY_PASSWORD'
+                        )]) {
+                            if (params.REMOTE_ENV_FILE_CREDENTIALS_ID?.trim()) {
+                                withCredentials([file(credentialsId: params.REMOTE_ENV_FILE_CREDENTIALS_ID.trim(), variable: 'REMOTE_ENV_FILE')]) {
+                                    if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                                        withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
+                                            withEnv(ansibleEnv) {
+                                                sh 'sh scripts/ci/deploy-ansible.sh'
+                                            }
+                                        }
+                                    } else {
+                                        withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
+                                            sh 'sh scripts/ci/deploy-ansible.sh'
+                                        }
+                                    }
+                                }
+                            } else if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                                withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
+                                    withEnv(ansibleEnv) {
+                                        sh 'sh scripts/ci/deploy-ansible.sh'
+                                    }
+                                }
+                            } else {
+                                withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
+                                    sh 'sh scripts/ci/deploy-ansible.sh'
+                                }
                             }
                         }
                     }

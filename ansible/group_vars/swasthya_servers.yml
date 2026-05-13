@@ -1,0 +1,15 @@
+---
+# Defaults used by the deployment playbook. Jenkins can override these with
+# environment variables through scripts/ci/deploy-ansible.sh.
+deploy_path: swasthya-setu
+compose_project_name: swasthya-setu
+run_service_db_sync: false
+docker_compose_become: false
+
+image_repository_prefix: ghcr.io/aditya01237/swasthya-setu
+image_tag: local
+
+registry_url: "{{ lookup('env', 'DOCKER_REGISTRY_URL') | default('', true) }}"
+registry_username: "{{ lookup('env', 'REGISTRY_USERNAME') | default('', true) }}"
+registry_password: "{{ lookup('env', 'REGISTRY_PASSWORD') | default('', true) }}"
+remote_env_file: "{{ lookup('env', 'REMOTE_ENV_FILE') | default('', true) }}"

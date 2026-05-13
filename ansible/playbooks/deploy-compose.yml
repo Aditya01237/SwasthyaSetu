@@ -1,0 +1,91 @@
+---
+- name: Deploy SwasthyaSetu with Docker Compose
+  hosts: swasthya_servers
+  gather_facts: false
+  vars:
+    compose_file_args: >-
+      -f docker-compose.yml -f docker-compose.images.yml{% if run_service_db_sync | bool %} -f docker-compose.service-dbs.yml{% endif %}
+    compose_environment:
+      IMAGE_REPOSITORY_PREFIX: "{{ image_repository_prefix }}"
+      IMAGE_TAG: "{{ image_tag }}"
+      COMPOSE_PROJECT_NAME: "{{ compose_project_name }}"
+    deployment_directories:
+      - "{{ deploy_path }}"
+      - "{{ deploy_path }}/docker/postgres"
+      - "{{ deploy_path }}/scripts/ci"
+    deployment_files:
+      - docker-compose.yml
+      - docker-compose.images.yml
+      - docker-compose.service-dbs.yml
+      - docker/postgres/init-multiple-databases.sh
+      - docker/postgres/sync-service-databases.sh
+      - scripts/ci/health-check.sh
+  tasks:
+    - name: Validate image inputs
+      ansible.builtin.assert:
+        that:
+          - image_repository_prefix | length > 0
+          - image_tag | length > 0
+        fail_msg: "image_repository_prefix and image_tag are required."
+
+    - name: Create deployment directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ deployment_directories }}"
+
+    - name: Copy Compose deployment bundle
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../{{ item }}"
+        dest: "{{ deploy_path }}/{{ item }}"
+        mode: "{{ '0755' if item.endswith('.sh') else '0644' }}"
+      loop: "{{ deployment_files }}"
+
+    - name: Copy environment file when provided
+      ansible.builtin.copy:
+        src: "{{ remote_env_file }}"
+        dest: "{{ deploy_path }}/.env"
+        mode: "0600"
+      when: remote_env_file | length > 0
+
+    - name: Log in to container registry when credentials are provided
+      ansible.builtin.command:
+        cmd: docker login "{{ registry_url }}" -u "{{ registry_username }}" --password-stdin
+        stdin: "{{ registry_password }}"
+      no_log: true
+      become: "{{ docker_compose_become | bool }}"
+      when:
+        - registry_url | length > 0
+        - registry_username | length > 0
+        - registry_password | length > 0
+
+    - name: Pull published images
+      ansible.builtin.command: "docker compose {{ compose_file_args }} pull"
+      args:
+        chdir: "{{ deploy_path }}"
+      environment: "{{ compose_environment }}"
+      become: "{{ docker_compose_become | bool }}"
+
+    - name: Start Compose stack from published images
+      ansible.builtin.command: "docker compose {{ compose_file_args }} up -d --no-build"
+      args:
+        chdir: "{{ deploy_path }}"
+      environment: "{{ compose_environment }}"
+      become: "{{ docker_compose_become | bool }}"
+
+    - name: Run service database sync when enabled
+      ansible.builtin.command: "docker compose {{ compose_file_args }} --profile service-dbs run --rm service-db-sync"
+      args:
+        chdir: "{{ deploy_path }}"
+      environment: "{{ compose_environment }}"
+      become: "{{ docker_compose_become | bool }}"
+      when: run_service_db_sync | bool
+
+    - name: Check deployed application health
+      ansible.builtin.command: sh scripts/ci/health-check.sh
+      args:
+        chdir: "{{ deploy_path }}"
+      environment: "{{ compose_environment }}"
+      become: "{{ docker_compose_become | bool }}"
+      changed_when: false

@@ -1,0 +1,37 @@
+---
+- name: Prepare Docker host for SwasthyaSetu
+  hosts: swasthya_servers
+  become: true
+  gather_facts: true
+  vars:
+    deploy_user: "{{ ansible_user | default(ansible_user_id) }}"
+    docker_packages:
+      - ca-certificates
+      - curl
+      - docker.io
+      - docker-compose-plugin
+  tasks:
+    - name: Require Debian or Ubuntu target
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == "Debian"
+        fail_msg: "This playbook currently supports Debian/Ubuntu targets."
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: "{{ docker_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Enable and start Docker
+      ansible.builtin.service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Allow deploy user to run Docker
+      ansible.builtin.user:
+        name: "{{ deploy_user }}"
+        groups: docker
+        append: true
+      when: deploy_user != "root"
