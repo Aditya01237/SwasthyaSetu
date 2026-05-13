@@ -1,0 +1,41 @@
+name: swasthya-setu
+
+services:
+  auth-service:
+    environment:
+      SPRING_DATASOURCE_URL: ${AUTH_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/auth_db}
+
+  hospital-service:
+    environment:
+      SPRING_DATASOURCE_URL: ${HOSPITAL_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/hospital_db}
+
+  appointment-service:
+    environment:
+      SPRING_DATASOURCE_URL: ${APPOINTMENT_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/appointment_db}
+
+  patient-service:
+    environment:
+      SPRING_DATASOURCE_URL: ${PATIENT_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/patient_db}
+
+  service-db-sync:
+    image: postgres:16-alpine
+    profiles:
+      - service-dbs
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
+      SOURCE_DB: ${POSTGRES_DB:-swasthyasetudb}
+      AUTH_DB: auth_db
+      PATIENT_DB: patient_db
+      APPOINTMENT_DB: appointment_db
+      HOSPITAL_DB: hospital_db
+    volumes:
+      - ./docker/postgres/sync-service-databases.sh:/scripts/sync-service-databases.sh:ro
+    entrypoint:
+      - /bin/sh
+      - /scripts/sync-service-databases.sh
+    depends_on:
+      postgres:
+        condition: service_healthy

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import logo from "../assets/logo.png";
 
 const Login = () => {
   const [isRegister, setIsRegister] = useState(false);
@@ -110,8 +111,12 @@ const Login = () => {
           <div className="p-8">
             {/* Logo */}
             <div className="flex justify-center mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-sky-500/20">
-                S
+              <div className="w-20 h-20 rounded-2xl bg-white p-2 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                <img
+                  src={logo}
+                  alt="SwasthyaSetu"
+                  className="w-full h-full object-contain rounded-xl"
+                />
               </div>
             </div>
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import api from "../api/axios";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import AuthToggle from "../components/AuthToggle";
+import logo from "../assets/logo.png";
 
 const STEPS = [
   {
@@ -134,13 +134,14 @@ const Register = () => {
 
           {/* Logo */}
           <div className="flex flex-col items-center gap-2 mb-6">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
-              style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
-            >
-              D
+            <div className="w-20 h-20 rounded-2xl bg-white p-2 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <img
+                src={logo}
+                alt="SwasthyaSetu"
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
-            <p className="text-white text-xl font-bold tracking-tight">MedPortal</p>
+            <p className="text-white text-xl font-bold tracking-tight">SwasthyaSetu Doctor</p>
             <p className="text-sm text-gray-500">New doctor registration</p>
           </div>
 

@@ -80,6 +80,16 @@ const slotToMinutes = (slot) => {
   return hours * 60 + minutes;
 };
 
+const convertTo24Hour = (time) => {
+  const [hourMin, period] = time.split(" ");
+  let [hours, minutes] = hourMin.split(":").map(Number);
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`;
+};
+
+const slotToBookedKey = (slot) => convertTo24Hour(slot).slice(0, 5);
+
 // If today → filter past slots (with 20min buffer). If future date → show all.
 const getAvailableSlots = (slots, selectedDate) => {
   if (!selectedDate) return [];
@@ -101,9 +111,49 @@ const DoctorProfile = () => {
   const [showBooking, setShowBooking] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [bookedSlotKeys, setBookedSlotKeys] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotError, setSlotError] = useState("");
   const [loadingBooking, setLoadingBooking] = useState(false);
 
   useEffect(() => { fetchDoctor(); }, []);
+
+  useEffect(() => {
+    if (!showBooking || !selectedDate || !id) {
+      setBookedSlotKeys([]);
+      setSlotError("");
+      return;
+    }
+
+    let ignore = false;
+
+    const fetchBookedSlots = async () => {
+      try {
+        setLoadingSlots(true);
+        setSlotError("");
+        const res = await api.get("/appointment/slots/booked", {
+          params: { doctorId: id, date: selectedDate },
+        });
+        if (!ignore) {
+          setBookedSlotKeys(Array.isArray(res.data) ? res.data : []);
+        }
+      } catch (err) {
+        console.error(err);
+        if (!ignore) {
+          setBookedSlotKeys([]);
+          setSlotError("Could not refresh booked slots. Please try another date or reopen booking.");
+        }
+      } finally {
+        if (!ignore) setLoadingSlots(false);
+      }
+    };
+
+    fetchBookedSlots();
+
+    return () => {
+      ignore = true;
+    };
+  }, [showBooking, selectedDate, id]);
 
   const fetchDoctor = async () => {
     setLoading(true);
@@ -115,14 +165,6 @@ const DoctorProfile = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const convertTo24Hour = (time) => {
-    const [hourMin, period] = time.split(" ");
-    let [hours, minutes] = hourMin.split(":");
-    if (period === "PM" && hours !== "12") hours = parseInt(hours) + 12;
-    if (period === "AM" && hours === "12") hours = "00";
-    return `${hours}:${minutes}:00`;
   };
 
   const handleBooking = async () => {
@@ -141,7 +183,7 @@ const DoctorProfile = () => {
       alert("Appointment booked successfully 🎉");
     } catch (err) {
       console.error(err);
-      alert("Booking failed");
+      alert(err.response?.data?.message || "Booking failed");
     } finally {
       setLoadingBooking(false);
     }
@@ -169,9 +211,14 @@ const DoctorProfile = () => {
     );
   }
 
-  const morningSlots = getAvailableSlots(ALL_MORNING, selectedDate);
-  const eveningSlots = getAvailableSlots(ALL_EVENING, selectedDate);
-  const noSlotsAvailable = selectedDate && morningSlots.length === 0 && eveningSlots.length === 0;
+  const bookedSlotSet = new Set(bookedSlotKeys);
+  const morningSlots = loadingSlots || slotError
+    ? []
+    : getAvailableSlots(ALL_MORNING, selectedDate).filter((slot) => !bookedSlotSet.has(slotToBookedKey(slot)));
+  const eveningSlots = loadingSlots || slotError
+    ? []
+    : getAvailableSlots(ALL_EVENING, selectedDate).filter((slot) => !bookedSlotSet.has(slotToBookedKey(slot)));
+  const noSlotsAvailable = selectedDate && !loadingSlots && !slotError && morningSlots.length === 0 && eveningSlots.length === 0;
 
   return (
     <div className="min-h-screen bg-[#090c12] text-slate-200 font-sans">
@@ -298,7 +345,13 @@ const DoctorProfile = () => {
                 type="date"
                 min={new Date().toISOString().split("T")[0]}
                 value={selectedDate}
-                onChange={(e) => { setSelectedDate(e.target.value); setSelectedSlot(""); }}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setSelectedSlot("");
+                  setBookedSlotKeys([]);
+                  setSlotError("");
+                  setLoadingSlots(Boolean(e.target.value));
+                }}
                 className="w-full mt-1.5 bg-white/[0.05] border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500/50"
               />
             </div>
@@ -310,10 +363,22 @@ const DoctorProfile = () => {
               </div>
             )}
 
+            {selectedDate && loadingSlots && (
+              <div className="mb-4 py-4 rounded-xl bg-sky-500/[0.05] border border-sky-500/20 text-xs text-sky-300 text-center">
+                Checking booked slots...
+              </div>
+            )}
+
+            {slotError && (
+              <div className="mb-4 py-4 rounded-xl bg-red-500/[0.05] border border-red-500/20 text-xs text-red-400 text-center">
+                {slotError}
+              </div>
+            )}
+
             {/* No slots */}
             {noSlotsAvailable && (
               <div className="mb-4 py-4 rounded-xl bg-red-500/[0.05] border border-red-500/20 text-xs text-red-400 text-center">
-                No slots available for today. Please select a future date.
+                No slots available for this date. Please select another date.
               </div>
             )}
 
@@ -374,7 +439,7 @@ const DoctorProfile = () => {
                 className="flex-1 py-2.5 rounded-xl bg-white/[0.05] text-slate-400 hover:bg-white/[0.08] text-sm transition-colors">
                 Cancel
               </button>
-              <button onClick={handleBooking} disabled={loadingBooking || !selectedSlot || !selectedDate}
+              <button onClick={handleBooking} disabled={loadingBooking || loadingSlots || Boolean(slotError) || !selectedSlot || !selectedDate}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white hover:opacity-90 text-sm font-medium transition-opacity disabled:opacity-60">
                 {loadingBooking ? "Booking..." : "Confirm"}
               </button>

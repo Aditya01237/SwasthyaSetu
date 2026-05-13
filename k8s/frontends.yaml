@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: swasthya-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: swasthya-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swasthya-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swasthya-frontend
+  template:
+    metadata:
+      labels:
+        app: swasthya-frontend
+    spec:
+      containers:
+        - name: swasthya-frontend
+          image: swasthya-setu-swasthya-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /patient/
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /patient/
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: doctor-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: doctor-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doctor-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doctor-frontend
+  template:
+    metadata:
+      labels:
+        app: doctor-frontend
+    spec:
+      containers:
+        - name: doctor-frontend
+          image: swasthya-setu-doctor-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /doctor/
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /doctor/
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20

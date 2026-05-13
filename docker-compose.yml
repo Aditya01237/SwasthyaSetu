@@ -8,10 +8,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
       POSTGRES_DB: ${POSTGRES_DB:-swasthyasetudb}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/10-create-service-dbs.sh:ro
+      - ./docker/postgres/sync-service-databases.sh:/scripts/sync-service-databases.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -47,9 +48,20 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8025/api/v1/info >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   ai-service:
     build:
-      context: ./ai-service
+      context: ./services/ai-service
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
     healthcheck:
@@ -60,16 +72,18 @@ services:
 
   backend:
     build:
-      context: ./SwasthyaSetu
+      context: ./services/backend
     environment:
       SERVER_PORT: 8090
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_URL: ${BACKEND_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/swasthyasetudb}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
-      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-false}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-false}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
       AI_SERVICE_URL: http://ai-service:8000
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174}
@@ -84,6 +98,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      mailpit:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8090/actuator/health || exit 1"]
       interval: 15s
@@ -92,21 +108,23 @@ services:
 
   auth-service:
     build:
-      context: ./auth-service
+      context: ./services/auth-service
     environment:
       SERVER_PORT: 8081
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_URL: ${AUTH_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/swasthyasetudb}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
-      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-at-least-32-characters}
     ports:
       - "${AUTH_SERVICE_PORT:-8081}:8081"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health || exit 1"]
@@ -116,16 +134,22 @@ services:
 
   hospital-service:
     build:
-      context: ./hospital-service
+      context: ./services/hospital-service
     environment:
       SERVER_PORT: 8084
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_URL: ${HOSPITAL_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/swasthyasetudb}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
       - "${HOSPITAL_SERVICE_PORT:-8084}:8084"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health || exit 1"]
@@ -135,24 +159,26 @@ services:
 
   appointment-service:
     build:
-      context: ./appointment-service
+      context: ./services/appointment-service
     environment:
       SERVER_PORT: 8083
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_URL: ${APPOINTMENT_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/swasthyasetudb}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
       - "${APPOINTMENT_SERVICE_PORT:-8083}:8083"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]
@@ -162,13 +188,17 @@ services:
 
   patient-service:
     build:
-      context: ./patient-service
+      context: ./services/patient-service
     environment:
       SERVER_PORT: 8082
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+      SPRING_DATASOURCE_URL: ${PATIENT_SERVICE_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/swasthyasetudb}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-myuser}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-myuser}
       AI_SERVICE_URL: http://ai-service:8000
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
       - "${PATIENT_SERVICE_PORT:-8082}:8082"
     depends_on:
@@ -176,15 +206,45 @@ services:
         condition: service_healthy
       ai-service:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
 
+  notification-service:
+    build:
+      context: ./services/notification-service
+    environment:
+      SERVER_PORT: 8086
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-false}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-false}
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8086}:8086"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8086/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   api-gateway:
     build:
-      context: ./api-gateway
+      context: ./services/api-gateway
     environment:
       SERVER_PORT: 8080
       BACKEND_URL: http://backend:8090

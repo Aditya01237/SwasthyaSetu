@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: swasthya-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: swasthya.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          - path: /patient
+            pathType: Prefix
+            backend:
+              service:
+                name: swasthya-frontend
+                port:
+                  number: 80
+          - path: /doctor
+            pathType: Prefix
+            backend:
+              service:
+                name: doctor-frontend
+                port:
+                  number: 80
