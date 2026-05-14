@@ -7,10 +7,6 @@ pipeline {
         timeout(time: 180, unit: 'MINUTES')
     }
 
-    // Every stage below runs each build (no when-skips). Minikube, K8s registry, Ansible, ELK use catchError
-    // so missing tools/credentials mark UNSTABLE but later stages still run. Publish is required to succeed
-    // for a green build when registry + Docker are configured.
-
     triggers {
         githubPush()
     }
@@ -19,7 +15,7 @@ pipeline {
         booleanParam(
             name: 'RUN_DOCKER_BUILD',
             defaultValue: false,
-            description: 'Unused for gating: Build Docker Images always runs. Kept for compatibility.'
+            description: 'Compatibility flag. Docker image build stage currently runs in the main CI path.'
         )
         booleanParam(
             name: 'RUN_SERVICE_DB_SYNC',
@@ -29,22 +25,22 @@ pipeline {
         booleanParam(
             name: 'PUBLISH_IMAGES',
             defaultValue: true,
-            description: 'Unused for gating: Publish always runs (needs registry credentials). Kept for compatibility.'
+            description: 'Compatibility flag. Publish Docker Images stage currently runs in the main CI path.'
         )
         booleanParam(
             name: 'RUN_MINIKUBE_DEPLOY',
             defaultValue: false,
-            description: 'Unused for gating: Minikube stage always runs (UNSTABLE if minikube missing).'
+            description: 'Run the local Minikube deployment stage.'
         )
         booleanParam(
             name: 'RUN_K8S_REGISTRY_DEPLOY',
             defaultValue: false,
-            description: 'Unused for gating: K8s registry deploy always runs (UNSTABLE if kubectl/cluster missing).'
+            description: 'Deploy Kubernetes manifests using images pulled from the configured registry.'
         )
         booleanParam(
             name: 'RUN_ANSIBLE_DEPLOY',
             defaultValue: false,
-            description: 'Unused for gating: Ansible stage always runs (UNSTABLE if inventory/SSH missing).'
+            description: 'Run the Ansible remote deployment stage.'
         )
         booleanParam(
             name: 'ANSIBLE_SETUP_DOCKER',
@@ -79,7 +75,7 @@ pipeline {
         string(
             name: 'REMOTE_SSH_CREDENTIALS_ID',
             defaultValue: '',
-            description: 'Jenkins SSH private key credential ID (remote or Ansible).'
+            description: 'Jenkins SSH private key credential ID for remote or Ansible deployment.'
         )
         string(
             name: 'REMOTE_ENV_FILE_CREDENTIALS_ID',
@@ -99,7 +95,7 @@ pipeline {
         booleanParam(
             name: 'RUN_ELK_VERIFICATION',
             defaultValue: false,
-            description: 'Unused for gating: ELK stage always runs (UNSTABLE if overlay/resources missing).'
+            description: 'Run ELK observability verification stage.'
         )
     }
 
@@ -110,12 +106,14 @@ pipeline {
         DOCKER_BUILDKIT = '1'
         MINIKUBE_PROFILE = 'minikube'
         K8S_NAMESPACE = 'swasthya-setu'
+
         POSTGRES_PORT = '15433'
         REDIS_PORT = '16379'
         RABBITMQ_PORT = '15673'
         RABBITMQ_MANAGEMENT_PORT = '15674'
         MAILPIT_SMTP_PORT = '11025'
         MAILPIT_UI_PORT = '18025'
+
         GATEWAY_PORT = '18080'
         AUTH_SERVICE_PORT = '18081'
         PATIENT_SERVICE_PORT = '18082'
@@ -124,7 +122,10 @@ pipeline {
         NOTIFICATION_SERVICE_PORT = '18086'
         BACKEND_PORT = '18090'
         AI_SERVICE_PORT = '18000'
+
         PATIENT_FRONTEND_PORT = '15173'
+        DOCTOR_FRONTEND_PORT = '15174'
+
         VAULT_PORT = '18200'
         VAULT_DEV_ROOT_TOKEN = 'swasthya-root-token'
     }
@@ -151,6 +152,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('auth-service') {
                     steps {
                         dir('services/auth-service') {
@@ -158,6 +160,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('hospital-service') {
                     steps {
                         dir('services/hospital-service') {
@@ -165,6 +168,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('appointment-service') {
                     steps {
                         dir('services/appointment-service') {
@@ -172,6 +176,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('patient-service') {
                     steps {
                         dir('services/patient-service') {
@@ -179,6 +184,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('notification-service') {
                     steps {
                         dir('services/notification-service') {
@@ -186,6 +192,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('backend') {
                     steps {
                         dir('services/backend') {
@@ -208,6 +215,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('doctor-frontend') {
                     steps {
                         dir('doctor-frontend') {
@@ -233,9 +241,11 @@ pipeline {
                     if (!params.DOCKER_REGISTRY_CREDENTIALS_ID?.trim()) {
                         error 'DOCKER_REGISTRY_CREDENTIALS_ID is required to seed Vault registry secrets before publish.'
                     }
+
                     if (!params.DOCKER_REGISTRY_URL?.trim()) {
                         error 'DOCKER_REGISTRY_URL is required for Vault registry seeding.'
                     }
+
                     withCredentials([usernamePassword(
                         credentialsId: params.DOCKER_REGISTRY_CREDENTIALS_ID.trim(),
                         usernameVariable: 'REGISTRY_USERNAME',
@@ -263,9 +273,11 @@ pipeline {
                     if (!params.DOCKER_REGISTRY_CREDENTIALS_ID?.trim()) {
                         error 'DOCKER_REGISTRY_CREDENTIALS_ID is required for Publish Docker Images.'
                     }
+
                     if (!params.IMAGE_REPOSITORY_PREFIX?.trim()) {
                         error 'IMAGE_REPOSITORY_PREFIX is required for Publish Docker Images.'
                     }
+
                     if (!params.DOCKER_REGISTRY_URL?.trim()) {
                         error 'DOCKER_REGISTRY_URL is required for Publish Docker Images.'
                     }
@@ -286,6 +298,9 @@ pipeline {
         }
 
         stage('Deploy Minikube') {
+            when {
+                expression { return params.RUN_MINIKUBE_DEPLOY }
+            }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh 'sh scripts/ci/deploy-minikube.sh'
@@ -294,6 +309,9 @@ pipeline {
         }
 
         stage('Deploy Kubernetes Registry Images') {
+            when {
+                expression { return params.RUN_K8S_REGISTRY_DEPLOY }
+            }
             steps {
                 script {
                     def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
@@ -313,18 +331,23 @@ pipeline {
         }
 
         stage('Deploy With Ansible') {
+            when {
+                expression { return params.RUN_ANSIBLE_DEPLOY }
+            }
             steps {
                 script {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
-                            error 'REMOTE_SSH_CREDENTIALS_ID is not set (configure Ansible or expect UNSTABLE).'
+                            error 'REMOTE_SSH_CREDENTIALS_ID is not set. Configure it before running Ansible deploy.'
                         }
+
                         if (!params.ANSIBLE_INVENTORY_PATH?.trim() && !params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
                             error 'ANSIBLE_INVENTORY_PATH or ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID is required for Ansible deploy.'
                         }
 
                         def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                         def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
+
                         def ansibleEnv = [
                             "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
                             "IMAGE_TAG=${resolvedImageTag}",
@@ -373,6 +396,9 @@ pipeline {
         }
 
         stage('ELK observability verification') {
+            when {
+                expression { return params.RUN_ELK_VERIFICATION }
+            }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                     sh 'sh scripts/ci/check-elk-observability.sh'
