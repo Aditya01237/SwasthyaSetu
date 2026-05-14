@@ -14,3 +14,4 @@ resources:
   - app-services.yaml
   - frontends.yaml
   - ingress.yaml
+  - hpa.yaml
