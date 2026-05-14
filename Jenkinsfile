@@ -4,24 +4,25 @@ pipeline {
     options {
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '20'))
+        timeout(time: 45, unit: 'MINUTES')
     }
 
+    // CSE 816: Git push → Jenkins (requires Git plugin + GitHub plugin). On the job, also enable
+    // "GitHub hook trigger for GITScm polling" and add the repo webhook → http(s)://<jenkins>/github-webhook/
     triggers {
-        // Git push webhook (requires GitHub plugin + repository webhook). For GIT SCM polling without hooks,
-        // add "Poll SCM" under the job's Build Triggers (per CSE 816: GitHub Hook / polling options).
         githubPush()
     }
 
     parameters {
         booleanParam(
             name: 'RUN_DOCKER_BUILD',
-            defaultValue: true,
-            description: 'Build all Docker images with Docker Compose after tests pass.'
+            defaultValue: false,
+            description: 'Build all Docker images with docker compose after tests (can take a long time on first run). Leave off for fastest green CI when time-boxed; enable when you need a full local image build.'
         )
         booleanParam(
             name: 'RUN_LOCAL_DEPLOY',
-            defaultValue: false,
-            description: 'Deploy the stack on the Jenkins Docker host after a successful build.'
+            defaultValue: true,
+            description: 'CSE 816: after publish, deploy on the Jenkins host with docker compose (turn off if you use only RUN_K8S_REGISTRY_DEPLOY or RUN_MINIKUBE_DEPLOY).'
         )
         booleanParam(
             name: 'RUN_SERVICE_DB_SYNC',
@@ -31,7 +32,7 @@ pipeline {
         booleanParam(
             name: 'PUBLISH_IMAGES',
             defaultValue: true,
-            description: 'Build and push app images to the configured Docker registry.'
+            description: 'CSE 816: build and push app images to Docker Hub (requires Jenkins credential DOCKER_REGISTRY_CREDENTIALS_ID).'
         )
         booleanParam(
             name: 'RUN_MINIKUBE_DEPLOY',
@@ -163,49 +164,49 @@ pipeline {
                 stage('api-gateway') {
                     steps {
                         dir('services/api-gateway') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('auth-service') {
                     steps {
                         dir('services/auth-service') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('hospital-service') {
                     steps {
                         dir('services/hospital-service') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('appointment-service') {
                     steps {
                         dir('services/appointment-service') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('patient-service') {
                     steps {
                         dir('services/patient-service') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('notification-service') {
                     steps {
                         dir('services/notification-service') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
                 stage('backend') {
                     steps {
                         dir('services/backend') {
-                            sh 'mvn -q test'
+                            sh 'mvn -B -q test'
                         }
                     }
                 }
@@ -217,16 +218,20 @@ pipeline {
                 stage('patient-frontend') {
                     steps {
                         dir('swasthya-frontend') {
-                            sh 'npm ci'
-                            sh 'npm run build'
+                            retry(2) {
+                                sh 'npm ci'
+                                sh 'npm run build'
+                            }
                         }
                     }
                 }
                 stage('doctor-frontend') {
                     steps {
                         dir('doctor-frontend') {
-                            sh 'npm ci'
-                            sh 'npm run build'
+                            retry(2) {
+                                sh 'npm ci'
+                                sh 'npm run build'
+                            }
                         }
                     }
                 }

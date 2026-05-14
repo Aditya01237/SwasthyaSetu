@@ -49,22 +49,24 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 32Mi
-            limits:
-              cpu: 200m
               memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /patient/
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 10
           livenessProbe:
             httpGet:
               path: /patient/
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 10
 ---
 apiVersion: v1
 kind: Service
@@ -117,19 +119,21 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 32Mi
-            limits:
-              cpu: 200m
               memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /doctor/
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 10
           livenessProbe:
             httpGet:
               path: /doctor/
               port: 80
             initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 10

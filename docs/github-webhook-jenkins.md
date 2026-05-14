@@ -24,9 +24,10 @@ Install these Jenkins plugins:
    - Repository URL: `https://github.com/Aditya01237/SwasthyaSetu.git`
    - Branch Specifier: `*/aditya-branch`
    - Script Path: `Jenkinsfile`
-5. Save the job.
+5. Under **Build Triggers**, enable **GitHub hook trigger for GITScm polling** (CSE 816).
+6. Save the job.
 
-The `Jenkinsfile` contains `githubPush()`, so Jenkins will accept GitHub webhook events for this job when the GitHub plugin is installed.
+The root `Jenkinsfile` declares `triggers { githubPush() }` so pushes are tied to the pipeline when the GitHub plugin is installed and the webhook below is configured.
 
 ## GitHub Webhook Setup
 

@@ -11,15 +11,23 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 - Docker with Docker Compose v2
 - Ansible optional, required only for `RUN_ANSIBLE_DEPLOY`
 - **`kubectl` required** on the Jenkins agent when you enable **`RUN_K8S_REGISTRY_DEPLOY`** (or use `RUN_MINIKUBE_DEPLOY`). The agent must use a kubeconfig whose default context points at your target cluster (Minikube, lab cluster, or cloud).
-- Jenkins plugins: Pipeline, Git, GitHub, Credentials Binding, SSH Agent, and JUnit
+- Jenkins plugins: **Pipeline**, **Git**, **GitHub** (for `githubPush()` + `/github-webhook/`), **Credentials Binding**, **SSH Agent**, and **JUnit**
 
 ## Create the Pipeline
 
 1. Create a Jenkins Pipeline job.
-2. Select Pipeline script from SCM.
-3. Use this repository URL and the `aditya-branch` branch.
-4. Set Script Path to `Jenkinsfile`.
-5. Configure the GitHub webhook using `docs/github-webhook-jenkins.md`.
+2. Select **Pipeline script from SCM**.
+3. **Git**: repository URL and branch (for example `*/aditya-branch` or `*/main`).
+4. Set **Script Path** to `Jenkinsfile`.
+5. Under **Build Triggers**, enable **GitHub hook trigger for GITScm polling** (CSE 816).
+6. Configure the GitHub webhook using `docs/github-webhook-jenkins.md` (Payload URL must end with `/github-webhook/`). If GitHub cannot reach Jenkins, use **Poll SCM** instead of the webhook.
+7. Save the job.
+
+### CSE 816 default pipeline (push → build)
+
+With the current `Jenkinsfile` defaults, a **Git push** (webhook + `githubPush()` trigger) runs **Validate → tests → frontends → AI check → publish to Docker Hub → deploy on the Jenkins host** (`RUN_LOCAL_DEPLOY`). Create Jenkins credentials **`swasthya-dockerhub`** (username + access token) before relying on defaults. For **Kubernetes-only** deploy, turn **`RUN_LOCAL_DEPLOY`** off and **`RUN_K8S_REGISTRY_DEPLOY`** on (needs `kubectl` context). **ELK** is optional in CI; enable **`RUN_ELK_VERIFICATION`** when you need the automated ELK smoke path. **`RUN_DOCKER_BUILD`** stays off when publishing (images are built during the publish stage).
+
+For a **tests-only** run (no Hub, no deploy), disable **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** in **Build with Parameters**.
 
 ## Manual Jenkins Setup
 
@@ -68,7 +76,7 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 - `ANSIBLE_INVENTORY_PATH`: repository inventory path when not using a secret inventory file.
 - `ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID`: optional Jenkins secret file credentials ID for Ansible inventory.
 
-For normal CI, keep only `RUN_DOCKER_BUILD` enabled. For local CD testing on a Jenkins machine with Docker, enable `RUN_LOCAL_DEPLOY`. Enable `RUN_SERVICE_DB_SYNC` when you specifically want to test the service-owned database path.
+The `Jenkinsfile` defaults target **CSE 816**: **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** are on. Turn **`PUBLISH_IMAGES`** off for CI-only runs. Enable **`RUN_DOCKER_BUILD`** only when you need a standalone **`docker compose build`** (no registry). Enable **`RUN_LOCAL_DEPLOY`** for Compose on the Jenkins host; enable **`RUN_SERVICE_DB_SYNC`** when you specifically want the service-owned database path.
 
 For registry publishing, enable `PUBLISH_IMAGES` and set `DOCKER_REGISTRY_CREDENTIALS_ID`. For remote deploy, also enable `RUN_REMOTE_DEPLOY` and provide the remote SSH parameters.
 

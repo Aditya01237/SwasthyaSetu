@@ -11,7 +11,7 @@ for service in \
   services/backend
 do
   echo "Testing $service..."
-  (cd "$service" && mvn -q test)
+  (cd "$service" && mvn -B -q test)
 done
 
 echo "Java service tests complete."
