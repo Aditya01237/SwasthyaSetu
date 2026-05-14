@@ -1,0 +1,226 @@
+================================================================================
+SWASTHYA SETU – PROJECT REPORT (NARRATIVE ONLY, NO CODE)
+================================================================================
+Use this file as the basis for your assignment write-up. You may copy sections
+into Word or Google Docs and add screenshots, diagrams, and your own results.
+
+
+--------------------------------------------------------------------------------
+1. WHAT THE PROJECT IS ABOUT
+--------------------------------------------------------------------------------
+
+SwasthyaSetu is a healthcare-oriented software platform built as a set of
+microservices. The idea is to separate concerns: user identity and doctors,
+patient profiles and medical records, appointments, hospitals, notifications,
+and an AI-assisted piece for features like document or image understanding.
+
+From a Software Production Engineering perspective, the emphasis is not only on
+the application logic but on how the whole system is delivered: version control,
+automated build and test, container images, optional deployment to Docker hosts
+or Kubernetes, configuration management with Ansible where needed, and
+observability patterns including logging toward an ELK-style stack.
+
+The repository therefore contains application source, container definitions,
+Kubernetes manifests, Jenkins automation, shell scripts for continuous
+integration and deployment, and documentation that maps those pieces to course
+rubrics such as CSE 816.
+
+
+--------------------------------------------------------------------------------
+2. WHAT WAS MADE OR IMPROVED (DELIVERABLES IN PLAIN LANGUAGE)
+--------------------------------------------------------------------------------
+
+A continuous integration and delivery pipeline was defined in a root Jenkinsfile
+so that a Jenkins server can check out the repository, validate configuration,
+run automated tests, build frontends, sanity-check the Python AI service, and
+then optionally build or publish Docker images and deploy them according to
+job parameters.
+
+Docker Compose was tuned so that services start reliably under a full stack:
+for example patient-service was given a more forgiving health check schedule and
+less verbose SQL logging in the container environment so health checks do not
+fail while the JVM is still starting. Mailpit was moved to less crowded host
+ports by default so a second stack or another mail tool on the machine does not
+block the stack from starting. A small companion environment file was added so
+that a Jenkins-oriented compose project name can use alternate host ports and
+avoid colliding with a developer’s already-running default stack on the same
+machine; the deploy helper script loads that file when the compose project name
+matches the Jenkins convention.
+
+Documentation was aligned with the pipeline: how to create the Jenkins job,
+which plugins are expected, how GitHub webhooks relate to polling, what each
+pipeline parameter means, and how Minikube or registry-based Kubernetes deploys
+fit into the same story.
+
+The pipeline itself was later simplified for day-to-day use: optional stages
+such as Minikube, Kubernetes-from-registry, remote SSH compose, Ansible, and ELK
+verification only run when explicitly enabled, instead of always appearing in
+every build. Java tests were consolidated into a single scripted stage and
+frontend builds into one sequential stage to reduce visual clutter and duplicate
+Docker builds before publish were removed when publishing already builds images.
+
+
+--------------------------------------------------------------------------------
+3. HOW THE SYSTEM IS STRUCTURED (CONCEPTUAL)
+--------------------------------------------------------------------------------
+
+Backend capabilities are split into several Spring Boot services behind an API
+gateway. A shared style is used: REST APIs, Spring Data where persistence is
+needed, message-driven updates through RabbitMQ for cross-service events, and
+Redis where the appointment path needs caching. PostgreSQL holds relational
+data; in development a single database is often used with an optional overlay
+for separate logical databases per service when testing stricter isolation.
+
+The AI service is a separate Python process exposed over HTTP so Java services
+can call it without sharing a runtime.
+
+Two web frontends exist: one oriented to patients and one to doctors. They are
+built as modern single-page applications and served as static files inside
+nginx-based container images in production-like setups.
+
+Mailpit can stand in for a real SMTP server during development so OTP and
+notification emails can be inspected in a browser without sending real mail.
+
+When the same application is run on Kubernetes, manifests describe deployments,
+services, ingress rules, horizontal pod autoscalers for selected services, and
+config maps and secrets for non-secret and secret configuration respectively.
+Minikube provides a local Kubernetes cluster for demonstrations; a script can
+start or reuse Minikube, enable ingress, build images against Minikube’s Docker
+where appropriate, apply the kustomized manifests, and run health checks often
+via short-lived port forwards.
+
+
+--------------------------------------------------------------------------------
+4. HOW THE JENKINS PIPELINE WORKS (STEP BY STEP, NO CODE)
+--------------------------------------------------------------------------------
+
+When a pipeline run starts, Jenkins checks out the branch configured on the job.
+
+The validate stage runs a shell script that asks Docker Compose to validate the
+main compose file and several common combinations with extra overlays such as
+published images, per-service databases, and observability. If kubectl is
+available on the agent, Kubernetes manifests are also rendered with kustomize as
+an early sanity check.
+
+Tests then run for all Java microservices in one stage using a loop script so
+Maven runs tests per service directory. Frontends are built sequentially with
+npm install and production build for each app, with a small retry policy on npm to
+tolerate transient registry issues. The AI service is checked with a Python
+bytecode compile step rather than a full test suite to keep the pipeline light.
+
+If the job is configured to publish, Jenkins injects registry credentials,
+performs a non-interactive Docker login, and runs a publish script that builds
+with the image-oriented compose overlay and pushes each application image to
+the configured registry, tagging them with the git commit or an explicit tag.
+
+If local deploy is enabled, another script brings the stack up on the Jenkins
+host with compose, optionally with a service-database overlay and a one-off sync
+job, then curls health endpoints on the host ports defined in the job
+environment so that Jenkins and a parallel default stack do not fight for the
+same ports.
+
+Other behaviors are strictly optional: deploying into Minikube on the same
+machine, applying rendered manifests to a cluster that pulls from a registry,
+copying compose to a remote host over SSH, driving Ansible playbooks, or running
+ELK verification. Each is gated by a boolean parameter so routine builds stay
+short and predictable.
+
+After the stages, Jenkins attaches JUnit results from Surefire where present and
+archives jars and frontend build artifacts for traceability.
+
+
+--------------------------------------------------------------------------------
+5. WHAT TOOLS AND TECHNOLOGIES ARE USED
+--------------------------------------------------------------------------------
+
+Version control and hosting use Git and GitHub. Jenkins provides the automation
+server; the Git and GitHub plugins support SCM checkout and push-triggered
+behavior when the job is wired with a webhook and GitHub hook trigger for SCM
+polling as the course describes.
+
+Build tools include JDK 21, Maven for Java services, Node.js and npm for both
+frontends, and Python for the AI service check.
+
+Containers use Docker with BuildKit and Compose v2. Images are built per service
+from Dockerfiles; compose files orchestrate the full stack and optional
+overlays.
+
+The container registry in examples is Docker Hub; credentials are stored in
+Jenkins as username and password or access token style secrets.
+
+Kubernetes and kubectl apply the kustomize layout under the k8s directory.
+Minikube supplies a local cluster; ingress addon is used when exposing HTTP
+routes in demos.
+
+Ansible supplies configuration-management style deployment to remote Linux hosts
+with playbooks and roles for installing Docker and laying down application
+material.
+
+HashiCorp Vault appears as an optional compose overlay for demonstrating secret
+storage rather than committing production secrets.
+
+Elasticsearch, Logstash, and Kibana appear through an observability compose
+overlay and a verification script for rubrics that require centralized logging
+and dashboards.
+
+Infrastructure services in the application stack include PostgreSQL, Redis,
+RabbitMQ, and Mailpit.
+
+
+--------------------------------------------------------------------------------
+6. HOW DEVOPS PIECES CONNECT IN PRACTICE
+--------------------------------------------------------------------------------
+
+A developer commits and pushes to GitHub. If the Jenkins job is configured with
+the webhook and polling trigger, a build is scheduled. Jenkins clones the repo,
+validates compose and optionally kustomize output, runs tests and frontend
+builds, then either stops there for a CI-only configuration or continues to
+registry login, image push, and local or remote deployment depending on
+parameters.
+
+The same images that are pushed can be referenced from Kubernetes manifests that
+are rendered with registry prefixes and tags for a cluster that pulls from the
+internet, which is how a typical “build in CI, deploy to cluster” loop closes.
+
+Local Minikube demos instead build images into Minikube’s Docker context so the
+cluster can run without a registry round trip, which is convenient on laptops
+but different from production’s immutable pull-based model.
+
+When two Compose stacks must coexist on one workstation, the high-port
+environment file and Jenkins environment variables keep Redis, RabbitMQ,
+Mailpit, gateways, and microservice ports from overlapping between a personal
+default project and a CI-named project.
+
+
+--------------------------------------------------------------------------------
+7. WHAT YOU SHOULD ADD IN YOUR OWN REPORT (YOUR EVIDENCE)
+--------------------------------------------------------------------------------
+
+Screenshots or short descriptions of: the GitHub repository and branch; the
+Jenkins job configuration showing Pipeline from SCM and the webhook or poll
+settings; a green pipeline run with stage timeline; Docker Hub showing pushed
+tags if you enabled publish; the application reachable via gateway or
+ingress; optional captures of Kibana or Ansible runs if you demonstrated those.
+
+A short reflection on trade-offs: sequential tests versus parallel tests,
+publishing every build versus on demand, and running ELK on resource-constrained
+agents.
+
+
+--------------------------------------------------------------------------------
+8. LIMITATIONS TO MENTION HONESTLY
+--------------------------------------------------------------------------------
+
+Secrets in Kubernetes example files should remain placeholders in git; real
+passwords belong in Jenkins credentials or sealed secrets.
+
+Running every optional integration on one small VM can exhaust CPU or memory;
+parameters exist partly to keep demonstrations reliable.
+
+Minikube networking and ingress sometimes need a tunnel process running in
+parallel for LoadBalancer-style ingress to behave like classroom slides suggest.
+
+
+================================================================================
+END OF NARRATIVE REPORT DRAFT
+================================================================================

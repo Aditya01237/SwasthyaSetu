@@ -1,8 +1,10 @@
 name: swasthya-setu
 
 # HashiCorp Vault — Secure secrets management for SwasthyaSetu
-# Usage: docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d vault
-# Then run: sh scripts/ci/setup-vault.sh
+# Local:  docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d vault
+#          then sh scripts/ci/setup-vault.sh (requires vault CLI on host)
+# Jenkins: scripts/ci/vault-ci.sh starts Vault, seeds KV from Jenkins credentials; publish uses
+#          scripts/ci/vault-registry-docker-login.sh. Set VAULT_PORT (e.g. 18200) if 8200 is busy.
 
 services:
   vault:

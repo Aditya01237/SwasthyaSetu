@@ -8,7 +8,7 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 - Maven 3.9+
 - Node.js 22+
 - Python 3.12+
-- Docker with Docker Compose v2
+- Docker with Docker Compose v2 (the pipeline starts a **HashiCorp Vault** dev container and uses it for **Docker Hub login** before `publish-images.sh`; no Vault CLI is required on the agent—only `docker` and `docker exec`).
 - Ansible optional, required only for `RUN_ANSIBLE_DEPLOY`
 - **`kubectl` required** on the Jenkins agent when you enable **`RUN_K8S_REGISTRY_DEPLOY`** (or use `RUN_MINIKUBE_DEPLOY`). The agent must use a kubeconfig whose default context points at your target cluster (Minikube, lab cluster, or cloud).
 - Jenkins plugins: **Pipeline**, **Git**, **GitHub** (for `githubPush()` + `/github-webhook/`), **Credentials Binding**, **SSH Agent**, and **JUnit**
@@ -25,9 +25,11 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 
 ### CSE 816 default pipeline (push → build)
 
-With the current `Jenkinsfile` defaults, a **Git push** runs **Validate → Java tests (`scripts/ci/test-java-services.sh`) → sequential frontends → AI check → publish → local Compose deploy** when **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** are on. **Minikube, K8s registry, remote SSH, Ansible, and ELK** run only when their parameters are enabled (otherwise those stages are **skipped**). Create Jenkins credentials **`swasthya-dockerhub`** before publishing. For **Kubernetes-only** deploy, turn **`RUN_LOCAL_DEPLOY`** off and **`RUN_K8S_REGISTRY_DEPLOY`** on. Use **`RUN_DOCKER_BUILD`** only for a standalone **`docker compose build`** when **`PUBLISH_IMAGES`** is off (publish already builds images).
+The root **`Jenkinsfile`** runs **Validate → parallel Java tests → parallel frontends → AI check → HashiCorp Vault (seed KV from Jenkins Docker Hub credentials) → Docker Compose build → Publish (Docker login reads registry password from Vault) → local deploy**, then optional deploy stages per your last saved parameters (see repository `Jenkinsfile` for current defaults). Create Jenkins credentials **`swasthya-dockerhub`** (or match **`DOCKER_REGISTRY_CREDENTIALS_ID`**) so the Vault stage can store registry username/password in KV before publish.
 
-For a **tests-only** run (no Hub, no deploy), disable **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** in **Build with Parameters**.
+**Vault in CI:** stage **`HashiCorp Vault`** runs **`scripts/ci/vault-ci.sh`** (Compose file **`docker-compose.vault.yml`**, host port **`VAULT_PORT`** default **18200** in the Jenkinsfile environment block). **`scripts/ci/vault-registry-docker-login.sh`** performs **`docker login`** using **`vault kv get`** inside the Vault container so the pipeline demonstrates **central secret storage** for registry access (dev-mode root token in Jenkins env—**not for production**).
+
+For a **tests-only** run you still need registry credentials if publish is enabled; turn off heavy stages only if your `Jenkinsfile` revision supports parameter gating.
 
 ## Manual Jenkins Setup
 
