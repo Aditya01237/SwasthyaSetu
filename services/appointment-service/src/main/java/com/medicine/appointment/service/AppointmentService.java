@@ -98,8 +98,8 @@ public class AppointmentService {
             qr.setToken(token);
             qr.setAppointment(savedAppointment);
             qr.setPatient(patient);
-            qr.setValidFrom(time.minusHours(3));
-            qr.setValidTo(time.plusHours(3));
+            qr.setValidFrom(LocalDateTime.now());  // valid from booking time (avoids UTC/IST mismatch)
+            qr.setValidTo(time.plusHours(3));        // valid until 3h after appointment
             qr.setUsed(false);
             qrTokenRepository.save(qr);
 
