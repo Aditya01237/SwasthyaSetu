@@ -7,8 +7,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: swasthya.local
-      http:
+    - http:
         paths:
           - path: /api
             pathType: Prefix
