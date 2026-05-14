@@ -3,6 +3,7 @@ package com.medicine.appointment.service;
 import com.medicine.appointment.dto.AppointmentDetailsDoctorResponse;
 import com.medicine.appointment.dto.AppointmentDetailsResponse;
 import com.medicine.appointment.dto.AppointmentListResponse;
+import com.medicine.appointment.dto.AppointmentReadModelResponse;
 import com.medicine.appointment.dto.AppointmentRequest;
 import com.medicine.appointment.dto.AppointmentResponse;
 import com.medicine.appointment.dto.DoctorAppointmentListResponse;
@@ -205,6 +206,22 @@ public class AppointmentService {
                 .stream()
                 .map(appointment -> appointment.getAppointmentTime().toLocalTime().format(SLOT_TIME_FORMATTER))
                 .toList();
+    }
+
+    @Transactional
+    public AppointmentReadModelResponse getReadModelSnapshot(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+        Patient patient = appointment.getPatient();
+        return new AppointmentReadModelResponse(
+                appointment.getId(),
+                appointment.getAppointmentTime().toString(),
+                appointment.getCreatedAt() != null ? appointment.getCreatedAt().toString() : null,
+                patient.getId(),
+                patient.getUhid(),
+                appointment.getDoctor().getId(),
+                appointment.getHospital().getId()
+        );
     }
 
 }

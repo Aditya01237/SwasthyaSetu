@@ -34,7 +34,8 @@ const Login = () => {
     try {
       setLoading(true);
       const res = await api.post("/auth/send-otp", { uhid });
-      setMaskedEmail(res.data?.maskedEmail || "");
+      const payload = res.data?.data ?? res.data;
+      setMaskedEmail(payload?.maskedEmail || "");
       setStep(2);
     } catch (err) {
       console.error(err);

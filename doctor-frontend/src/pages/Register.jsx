@@ -78,7 +78,9 @@ const Register = () => {
       setLoading(true);
       await api.post(`/auth/doctor/send-otp?email=${form.email}`);
       setOtpSent(true);
-      alert("OTP sent 📩");
+      alert(
+        "OTP sent to your email. Check inbox and spam/junk if you do not see it within a minute.",
+      );
     } catch (err) {
       alert(err.response?.data || "Error sending OTP");
     } finally {

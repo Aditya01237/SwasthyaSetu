@@ -18,10 +18,11 @@ public class EmailService {
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
+    /** Envelope From; required by many SMTP servers. Not the same as SMTP auth username. */
     private final String fromEmail;
 
     public EmailService(JavaMailSender mailSender,
-            @Value("${spring.mail.username:}") String fromEmail) {
+            @Value("${app.notification.from:noreply@swasthyasetu.local}") String fromEmail) {
         this.mailSender = mailSender;
         this.fromEmail = fromEmail;
     }
@@ -56,8 +57,7 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setTo(toEmail);
             helper.setSubject(subject);
-            if (!isBlank(fromEmail))
-                helper.setFrom(fromEmail);
+            helper.setFrom(fromEmail);
             helper.setText(html, true);
             mailSender.send(message);
         } catch (MessagingException ex) {

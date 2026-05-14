@@ -4,6 +4,9 @@
 # Usage: sh scripts/k8s-phased-start.sh
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+
 NS="swasthya-setu"
 KUBECTL="kubectl --request-timeout=20s"
 
@@ -51,7 +54,22 @@ scale_and_wait() {
 }
 
 # ─── Phase 0: Reset everything to 0 replicas ────────────────────────────────
-log "Phase 0 — Scaling ALL app deployments to 0 (clean slate)"
+log "Phase 0a — Removing HPAs (minReplicas>=1 would otherwise block scale-to-zero)"
+$KUBECTL delete hpa -n "$NS" --all --ignore-not-found >/dev/null 2>&1 || true
+# Wait until no HPAs remain so the controller stops reconciling replica counts.
+elapsed=0
+while [ "$elapsed" -lt 120 ]; do
+  count="$($KUBECTL get hpa -n "$NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')"
+  count="${count:-0}"
+  if [ "$count" = "0" ]; then
+    ok "HPAs cleared in namespace $NS"
+    break
+  fi
+  sleep 2
+  elapsed=$((elapsed + 2))
+done
+
+log "Phase 0b — Scaling ALL app deployments to 0 (clean slate)"
 for dep in api-gateway auth-service hospital-service appointment-service \
            patient-service notification-service ai-service backend \
            swasthya-frontend doctor-frontend; do
@@ -106,6 +124,12 @@ ok "Frontends healthy"
 # ─── Final status ───────────────────────────────────────────────────────────
 log "All phases complete — final pod status:"
 $KUBECTL get pods -n "$NS" 2>/dev/null
+
+if [ -f "$REPO_ROOT/k8s/hpa.yaml" ]; then
+  log "Restoring HorizontalPodAutoscalers from k8s/hpa.yaml"
+  $KUBECTL apply -f "$REPO_ROOT/k8s/hpa.yaml"
+  ok "HPAs reapplied"
+fi
 
 printf '\n\033[1;32m✅ SwasthyaSetu is fully up on Kubernetes!\033[0m\n'
 printf '\nRun the following to access the app:\n'

@@ -7,6 +7,8 @@ pipeline {
     }
 
     triggers {
+        // Git push webhook (requires GitHub plugin + repository webhook). For GIT SCM polling without hooks,
+        // add "Poll SCM" under the job's Build Triggers (per CSE 816: GitHub Hook / polling options).
         githubPush()
     }
 
@@ -38,8 +40,8 @@ pipeline {
         )
         booleanParam(
             name: 'RUN_K8S_REGISTRY_DEPLOY',
-            defaultValue: true,
-            description: 'Deploy published registry images to the configured Kubernetes context.'
+            defaultValue: false,
+            description: 'Deploy published registry images to the configured Kubernetes context. Enable only when this Jenkins agent has a valid kubectl context (otherwise the stage fails).'
         )
         booleanParam(
             name: 'RUN_ANSIBLE_DEPLOY',
@@ -110,6 +112,11 @@ pipeline {
             name: 'ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID',
             defaultValue: '',
             description: 'Optional Jenkins secret file credentials ID for the Ansible inventory.'
+        )
+        booleanParam(
+            name: 'RUN_ELK_VERIFICATION',
+            defaultValue: false,
+            description: 'CSE 816 / observability: start Elasticsearch, Logstash, and Kibana (Compose overlay), then run ELK health checks and a GELF smoke test into the swasthya-setu-logs-* index. Requires Docker on the Jenkins agent; can be memory-heavy.'
         )
     }
 
@@ -438,6 +445,15 @@ pipeline {
                         }
                     }
                 }
+            }
+        }
+
+        stage('ELK observability verification') {
+            when {
+                expression { params.RUN_ELK_VERIFICATION }
+            }
+            steps {
+                sh 'sh scripts/ci/check-elk-observability.sh'
             }
         }
     }

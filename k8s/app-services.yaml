@@ -16,9 +16,13 @@ kind: Deployment
 metadata:
   name: backend
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 0
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: backend
@@ -101,7 +105,7 @@ spec:
               port: 8090
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -121,9 +125,13 @@ kind: Deployment
 metadata:
   name: auth-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: auth-service
@@ -206,7 +214,7 @@ spec:
               port: 8081
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -226,9 +234,13 @@ kind: Deployment
 metadata:
   name: hospital-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: hospital-service
@@ -306,7 +318,7 @@ spec:
               port: 8084
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -326,9 +338,13 @@ kind: Deployment
 metadata:
   name: appointment-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: appointment-service
@@ -406,7 +422,7 @@ spec:
               port: 8083
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -426,9 +442,13 @@ kind: Deployment
 metadata:
   name: patient-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: patient-service
@@ -506,7 +526,7 @@ spec:
               port: 8082
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -526,9 +546,13 @@ kind: Deployment
 metadata:
   name: notification-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: notification-service
@@ -601,7 +625,7 @@ spec:
               port: 8086
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -621,9 +645,13 @@ kind: Deployment
 metadata:
   name: api-gateway
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: api-gateway
@@ -681,7 +709,7 @@ spec:
               port: 8080
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 90
 ---
 apiVersion: v1
 kind: Service
@@ -701,6 +729,7 @@ kind: Deployment
 metadata:
   name: ai-service
 spec:
+  progressDeadlineSeconds: 1200
   replicas: 1
   selector:
     matchLabels:
@@ -739,7 +768,7 @@ spec:
               port: 8000
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 18
+            failureThreshold: 60
           resources:
             requests:
               memory: "64Mi"

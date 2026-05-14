@@ -1,6 +1,6 @@
 # Jenkins CI/CD
 
-This repository uses the root `Jenkinsfile` for build, test, image build, optional registry publishing, and optional deployment.
+This repository uses the root `Jenkinsfile` for build, test, image build, optional registry publishing, and optional deployment. For a **course rubric crosswalk** (CSE 816), see **`docs/cse816-rubric-mapping.md`**.
 
 ## Jenkins Agent Requirements
 
@@ -10,7 +10,7 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 - Python 3.12+
 - Docker with Docker Compose v2
 - Ansible optional, required only for `RUN_ANSIBLE_DEPLOY`
-- `kubectl` optional, used only to render the local Kubernetes manifests
+- **`kubectl` required** on the Jenkins agent when you enable **`RUN_K8S_REGISTRY_DEPLOY`** (or use `RUN_MINIKUBE_DEPLOY`). The agent must use a kubeconfig whose default context points at your target cluster (Minikube, lab cluster, or cloud).
 - Jenkins plugins: Pipeline, Git, GitHub, Credentials Binding, SSH Agent, and JUnit
 
 ## Create the Pipeline
@@ -51,7 +51,8 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 - `RUN_SERVICE_DB_SYNC`: deploys with `docker-compose.service-dbs.yml` and seeds `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
 - `PUBLISH_IMAGES`: builds and pushes app/frontend images to a registry using `docker-compose.images.yml`.
 - `RUN_MINIKUBE_DEPLOY`: builds images inside Minikube, applies `k8s/`, and runs Kubernetes rollout/health checks.
-- `RUN_K8S_REGISTRY_DEPLOY`: deploys the just-published Docker Hub images to the configured Kubernetes context.
+- `RUN_K8S_REGISTRY_DEPLOY`: deploys the just-published Docker Hub images to the configured Kubernetes context (default off so agents without `kubectl` still pass the pipeline; turn on when the agent has a valid cluster context).
+- `RUN_ELK_VERIFICATION`: starts Elasticsearch, Logstash, and Kibana (Compose overlay) and runs ELK health checks plus a GELF smoke test (see `docs/cse816-rubric-mapping.md`).
 - `RUN_ANSIBLE_DEPLOY`: deploys published images to a remote Docker host with Ansible.
 - `ANSIBLE_SETUP_DOCKER`: installs and starts Docker on the target before Ansible deployment.
 - `IMAGE_REPOSITORY_PREFIX`: image prefix, for example `docker.io/adityapareek01`.
@@ -76,6 +77,58 @@ For Ansible deploy, enable `PUBLISH_IMAGES` and `RUN_ANSIBLE_DEPLOY`, provide `R
 For Minikube CD testing, enable `RUN_MINIKUBE_DEPLOY`. The Jenkins agent must have Docker, Minikube, and kubectl access.
 
 For Kubernetes deployment from Docker Hub, enable `PUBLISH_IMAGES` and `RUN_K8S_REGISTRY_DEPLOY`. The Jenkins agent must have `kubectl` configured for the target cluster.
+
+## Jenkins + Kubernetes (typical SPE workflow)
+
+Use this when the course requires **orchestration on Kubernetes** with **Jenkins** driving build, test, image publish, and deploy.
+
+### What runs in Jenkins
+
+1. **Checkout** → **Validate** → **Tests** (Java, frontends, AI check).
+2. **`PUBLISH_IMAGES`**: build and push all app images with `scripts/ci/publish-images.sh` (Docker Hub or your `IMAGE_REPOSITORY_PREFIX`).
+3. **`RUN_K8S_REGISTRY_DEPLOY`**: `scripts/ci/render-k8s-registry.sh` rewrites image names/tags, then `kubectl apply` deploys to the cluster. Optional rollout health checks run via `scripts/ci/health-check-k8s.sh`.
+
+Do **not** turn on **`RUN_MINIKUBE_DEPLOY`** at the same time as **`RUN_K8S_REGISTRY_DEPLOY`** (the `Jenkinsfile` blocks that combination).
+
+### One-time setup
+
+| Step | Action |
+|------|--------|
+| Cluster | A reachable Kubernetes cluster (Minikube on the Jenkins box, a lab VM, or a managed cluster). |
+| `kubectl` on the agent | Install `kubectl` and use a kubeconfig whose **default context** points at the target cluster. For Minikube on the same machine: `minikube start`, then select that context. |
+| Registry | Images must be **pullable** by nodes. Public Docker Hub repos work with the current manifests. Private repos need **`imagePullSecrets`** on Deployments (not in base `k8s/`). |
+| Namespace | `k8s/kustomization.yaml` sets namespace **`swasthya-setu`** (matches Jenkins `K8S_NAMESPACE`). |
+| Secrets | Edit or replace **`k8s/app-secrets.yaml`** (or create `swasthya-secrets` separately) for DB, JWT, RabbitMQ, and mail before non-local demos. |
+| Ingress / DNS | See **`k8s/README.md`**: ingress addon, `swasthya.local` in `/etc/hosts`, etc. |
+| HPA | Install **metrics-server** if you use **`k8s/hpa.yaml`**. |
+
+### Jenkins job parameters (Kubernetes CD)
+
+| Parameter | Value for K8s + registry deploy |
+|-----------|-----------------------------------|
+| `PUBLISH_IMAGES` | **true** |
+| `RUN_K8S_REGISTRY_DEPLOY` | **true** |
+| `RUN_MINIKUBE_DEPLOY` | **false** |
+| `IMAGE_REPOSITORY_PREFIX` | e.g. `docker.io/yourdockerhubuser` (must match pushed images) |
+| `IMAGE_TAG` | Leave empty for **Git commit SHA** (first 12 chars), or set a release tag |
+| Registry credentials | As in **`docs/dockerhub-setup.md`** |
+
+After a successful deploy, access URLs match **`k8s/README.md`** (ingress host or port-forwards from `health-check-k8s.sh`).
+
+To demonstrate **ELK in CI**, enable **`RUN_ELK_VERIFICATION`** on an agent with enough RAM for Elasticsearch, then open Kibana per **`docs/kibana-elk-dashboard.md`**.
+
+### GitHub webhook
+
+Keep **`githubPush()`** in the `Jenkinsfile` so pushes trigger the pipeline; configure the webhook per **`docs/github-webhook-jenkins.md`**.
+
+### Manual rehearsal (same as the deploy stage)
+
+```bash
+IMAGE_REPOSITORY_PREFIX=docker.io/yourdockerhubuser \
+IMAGE_TAG=your-tag \
+K8S_NAMESPACE=swasthya-setu \
+sh scripts/ci/deploy-k8s-registry.sh
+```
 
 Jenkins local deploy uses CI-only host ports so it can run beside your normal local Docker stack:
 

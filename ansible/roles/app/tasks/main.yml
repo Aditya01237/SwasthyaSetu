@@ -20,6 +20,7 @@
     - docker-compose.images.yml
     - docker-compose.service-dbs.yml
     - docker/postgres/init-multiple-databases.sh
+    - docker/postgres/sync-service-databases.sh
     - scripts/ci/health-check.sh
 
 - name: Copy .env file if provided

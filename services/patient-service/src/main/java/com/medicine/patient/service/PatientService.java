@@ -9,18 +9,23 @@ import com.medicine.patient.dto.PatientInfoDto;
 import com.medicine.patient.dto.PatientRegisterRequest;
 import com.medicine.patient.dto.PatientResponse;
 import com.medicine.patient.dto.PrescriptionResponse;
+import com.medicine.patient.client.AppointmentReadModelClient;
+import com.medicine.patient.dto.AppointmentReadModelSnapshot;
 import com.medicine.patient.dto.QrAccessResponse;
 import com.medicine.patient.entity.Appointment;
 import com.medicine.patient.entity.AuditLog;
 import com.medicine.patient.entity.Doctor;
+import com.medicine.patient.entity.Hospital;
 import com.medicine.patient.entity.MedicalRecord;
 import com.medicine.patient.entity.Medicine;
 import com.medicine.patient.entity.Patient;
 import com.medicine.patient.repository.AppointmentRepository;
 import com.medicine.patient.repository.AuditLogRepository;
 import com.medicine.patient.repository.DoctorRepository;
+import com.medicine.patient.repository.HospitalRepository;
 import com.medicine.patient.repository.MedicalRecordRepository;
 import com.medicine.patient.repository.PatientRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,6 +43,9 @@ public class PatientService {
     private final AppointmentRepository appointmentRepository;
     private final AuditLogRepository auditLogRepository;
     private final DoctorRepository doctorRepository;
+    private final HospitalRepository hospitalRepository;
+    private final EntityManager entityManager;
+    private final AppointmentReadModelClient appointmentReadModelClient;
     private final AiClient aiClient;
     private final PatientEventPublisher patientEventPublisher;
 
@@ -46,6 +54,9 @@ public class PatientService {
                           AppointmentRepository appointmentRepository,
                           AuditLogRepository auditLogRepository,
                           DoctorRepository doctorRepository,
+                          HospitalRepository hospitalRepository,
+                          EntityManager entityManager,
+                          AppointmentReadModelClient appointmentReadModelClient,
                           AiClient aiClient,
                           PatientEventPublisher patientEventPublisher) {
         this.patientRepository = patientRepository;
@@ -53,6 +64,9 @@ public class PatientService {
         this.appointmentRepository = appointmentRepository;
         this.auditLogRepository = auditLogRepository;
         this.doctorRepository = doctorRepository;
+        this.hospitalRepository = hospitalRepository;
+        this.entityManager = entityManager;
+        this.appointmentReadModelClient = appointmentReadModelClient;
         this.aiClient = aiClient;
         this.patientEventPublisher = patientEventPublisher;
     }
@@ -155,15 +169,16 @@ public class PatientService {
     }
 
     @Transactional
-    public QrAccessResponse recordQrAccess(Long patientId, Long appointmentId, Long doctorId) {
-        Patient patient = patientRepository.findById(patientId)
-                .orElseThrow(() -> new RuntimeException("Patient not found"));
+    public QrAccessResponse recordQrAccess(Long appointmentId, Long doctorId) {
+        ensureAppointmentReadModel(appointmentId);
+
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
+        Patient patient = appointment.getPatient();
         Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new RuntimeException("Doctor not found"));
 
-        if (appointment.getPatient() == null || !Objects.equals(appointment.getPatient().getId(), patient.getId())) {
+        if (!Objects.equals(appointment.getDoctor().getId(), doctorId)) {
             throw new RuntimeException("Unauthorized appointment access");
         }
 
@@ -185,6 +200,36 @@ public class PatientService {
                         .toList()
         );
         return response;
+    }
+
+    /**
+     * Ensures a read-model row exists (Rabbit may have been missed or patient PKs differ across services).
+     */
+    private void ensureAppointmentReadModel(Long appointmentId) {
+        if (appointmentRepository.existsById(appointmentId)) {
+            return;
+        }
+        AppointmentReadModelSnapshot snap = appointmentReadModelClient.fetchSnapshot(appointmentId);
+        Patient patient = patientRepository.findById(snap.sourcePatientId())
+                .or(() -> patientRepository.findByUhid(snap.patientUhid()))
+                .orElseThrow(() -> new RuntimeException("Patient not found"));
+        Doctor doctor = doctorRepository.findById(snap.doctorId())
+                .orElseThrow(() -> new RuntimeException("Doctor not found"));
+        Hospital hospital = hospitalRepository.findById(snap.hospitalId())
+                .orElseThrow(() -> new RuntimeException("Hospital not found"));
+
+        Appointment appointment = new Appointment();
+        appointment.setId(snap.appointmentId());
+        appointment.setPatient(patient);
+        appointment.setDoctor(doctor);
+        appointment.setHospital(hospital);
+        appointment.setAppointmentTime(LocalDateTime.parse(snap.appointmentTime()));
+        appointment.setCreatedAt(
+                snap.createdAt() == null || snap.createdAt().isBlank()
+                        ? LocalDateTime.now()
+                        : LocalDateTime.parse(snap.createdAt())
+        );
+        entityManager.persist(appointment);
     }
 
     @Transactional(readOnly = true)

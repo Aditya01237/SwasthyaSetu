@@ -55,7 +55,7 @@ query_elasticsearch() {
 attempt=1
 while [ "$attempt" -le "$RETRIES" ]; do
   response="$(query_elasticsearch || true)"
-  hits="$(printf '%s' "$response" | python3 -c 'import json,sys; data=sys.stdin.read().strip(); print(json.loads(data)["hits"]["total"]["value"] if data else 0)' 2>/dev/null || echo 0)"
+  hits="$(printf '%s' "$response" | python3 -c 'import json,sys; d=sys.stdin.read().strip(); print(0 if not d else (lambda t: t["value"] if isinstance(t, dict) else t)(json.loads(d)["hits"]["total"]))' 2>/dev/null || echo 0)"
 
   if [ "$hits" -gt 0 ]; then
     echo "ELK smoke log found in Elasticsearch: ${SMOKE_ID}"

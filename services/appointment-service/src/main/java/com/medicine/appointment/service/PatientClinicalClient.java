@@ -20,9 +20,9 @@ public class PatientClinicalClient {
         this.patientServiceUrl = patientServiceUrl;
     }
 
-    public PatientQrAccessResponse recordQrAccess(Long patientId, Long appointmentId, Long doctorId) {
+    public PatientQrAccessResponse recordQrAccess(Long appointmentId, Long doctorId) {
         PatientQrAccessResponse response = restTemplate.postForObject(
-                patientServiceUrl + "/internal/patients/" + patientId + "/qr-access",
+                patientServiceUrl + "/internal/appointments/" + appointmentId + "/qr-access",
                 new PatientQrAccessRequest(doctorId, appointmentId),
                 PatientQrAccessResponse.class
         );

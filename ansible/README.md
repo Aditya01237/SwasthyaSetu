@@ -1,6 +1,6 @@
 # Ansible Deployment
 
-This folder adds the configuration-management phase required by the final project. It prepares a Linux Docker host and deploys the same Compose stack that Jenkins already builds and publishes.
+SwasthyaSetu uses **modular Ansible roles** (CSE 816 “modular design”): **`common`**, **`docker`**, and **`app`**, orchestrated by playbooks under `ansible/playbooks/`.
 
 ## Files
 

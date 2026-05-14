@@ -17,14 +17,14 @@ ON CONFLICT DO NOTHING;
 INSERT INTO appointments (appointment_time, doctor_id, hospital_id, patient_id)
 SELECT NOW() + INTERVAL '1 day', d.id, 'HOSP123', p.id
 FROM doctors d, patients p
-WHERE d.email = 'dr.smith@example.com' AND p.uhid = 'UHID-987654321'
+WHERE d.email = 'adityapareek874@gmail.com' AND p.uhid = 'UHID-987654321'
 ON CONFLICT DO NOTHING;
 
 -- Insert Appointment (Completed yesterday)
 INSERT INTO appointments (appointment_time, doctor_id, hospital_id, patient_id)
 SELECT NOW() - INTERVAL '1 day', d.id, 'HOSP123', p.id
 FROM doctors d, patients p
-WHERE d.email = 'dr.smith@example.com' AND p.uhid = 'UHID-987654321'
+WHERE d.email = 'adityapareek874@gmail.com' AND p.uhid = 'UHID-987654321'
 ON CONFLICT DO NOTHING;
 
 -- Insert QR Token for the completed appointment

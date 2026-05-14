@@ -45,7 +45,6 @@ public class QrService {
                 .orElseThrow(() -> new RuntimeException("Doctor Not Found"));
 
         PatientQrAccessResponse qrAccess = patientClinicalClient.recordQrAccess(
-                qr.getPatient().getId(),
                 qr.getAppointment().getId(),
                 doctor.getId()
         );

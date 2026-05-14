@@ -34,10 +34,12 @@ data:
   APP_EVENTS_PATIENT_HOSPITAL_UPSERTED_QUEUE: patient.hospital-upserted
   APP_EVENTS_PATIENT_DOCTOR_REGISTERED_QUEUE: patient.doctor-registered
   APP_EVENTS_HOSPITAL_DOCTOR_REGISTERED_QUEUE: hospital.doctor-registered
-  SPRING_MAIL_HOST: mailpit
-  SPRING_MAIL_PORT: "1025"
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
+  # Real SMTP (Gmail) for OTP/notifications in Minikube. Set spring-mail-* in app-secrets.yaml.
+  # For Mailpit-only testing, set host mailpit, port 1025, auth/starttls false here instead.
+  SPRING_MAIL_HOST: smtp.gmail.com
+  SPRING_MAIL_PORT: "587"
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
   MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
   MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
   MANAGEMENT_HEALTH_REDIS_ENABLED: "false"

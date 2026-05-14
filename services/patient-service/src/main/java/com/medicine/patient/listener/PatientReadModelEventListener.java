@@ -1,5 +1,6 @@
 package com.medicine.patient.listener;
 
+import com.medicine.patient.client.AppointmentReadModelClient;
 import com.medicine.patient.entity.Appointment;
 import com.medicine.patient.entity.Doctor;
 import com.medicine.patient.entity.Hospital;
@@ -7,6 +8,7 @@ import com.medicine.patient.entity.Patient;
 import com.medicine.patient.event.AppointmentBookedEvent;
 import com.medicine.patient.event.DoctorRegisteredEvent;
 import com.medicine.patient.event.HospitalUpsertedEvent;
+import com.medicine.patient.dto.DoctorReadModelSnapshot;
 import com.medicine.patient.repository.AppointmentRepository;
 import com.medicine.patient.repository.DoctorRepository;
 import com.medicine.patient.repository.HospitalRepository;
@@ -35,6 +37,7 @@ public class PatientReadModelEventListener {
     private final DoctorRepository doctorRepository;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
+    private final AppointmentReadModelClient appointmentReadModelClient;
 
     public PatientReadModelEventListener(ObjectMapper objectMapper,
                                          AppointmentRepository appointmentRepository,
@@ -42,7 +45,8 @@ public class PatientReadModelEventListener {
                                          HospitalRepository hospitalRepository,
                                          DoctorRepository doctorRepository,
                                          EntityManager entityManager,
-                                         TransactionTemplate transactionTemplate) {
+                                         TransactionTemplate transactionTemplate,
+                                         AppointmentReadModelClient appointmentReadModelClient) {
         this.objectMapper = objectMapper;
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
@@ -50,6 +54,7 @@ public class PatientReadModelEventListener {
         this.doctorRepository = doctorRepository;
         this.entityManager = entityManager;
         this.transactionTemplate = transactionTemplate;
+        this.appointmentReadModelClient = appointmentReadModelClient;
     }
 
     @RabbitListener(queues = "${app.events.queues.patient-appointment-booked}")
@@ -59,7 +64,7 @@ public class PatientReadModelEventListener {
                 AppointmentBookedEvent event = objectMapper.readValue(payload, AppointmentBookedEvent.class);
                 Optional<Patient> patient = findPatient(event);
                 Optional<Hospital> hospital = event.hospitalId() == null ? Optional.empty() : hospitalRepository.findById(event.hospitalId());
-                Optional<Doctor> doctor = event.doctorId() == null ? Optional.empty() : doctorRepository.findById(event.doctorId());
+                Optional<Doctor> doctor = resolveDoctorForAppointmentBooked(event);
 
                 if (patient.isEmpty() || hospital.isEmpty() || doctor.isEmpty()) {
                     log.warn(
@@ -72,29 +77,74 @@ public class PatientReadModelEventListener {
                     return null;
                 }
 
-                Appointment appointment = event.appointmentId() == null
-                        ? new Appointment()
-                        : appointmentRepository.findById(event.appointmentId()).orElseGet(Appointment::new);
-                if (event.appointmentId() != null) {
-                    appointment.setId(event.appointmentId());
+                Long appointmentId = event.appointmentId();
+                if (appointmentId == null) {
+                    log.warn("Skipping appointment.booked sync: missing appointmentId");
+                    return null;
                 }
-                appointment.setPatient(patient.get());
-                appointment.setHospital(hospital.get());
-                appointment.setDoctor(doctor.get());
-                appointment.setAppointmentTime(parseDateTime(event.appointmentTime()));
-                appointment.setCreatedAt(parseDateTime(event.createdAt()));
-                if (appointment.getId() != null) {
-                    entityManager.merge(appointment);
-                } else {
+
+                if (appointmentRepository.existsById(appointmentId)) {
+                    Appointment appointment = appointmentRepository.findById(appointmentId).orElseThrow();
+                    appointment.setPatient(patient.get());
+                    appointment.setHospital(hospital.get());
+                    appointment.setDoctor(doctor.get());
+                    appointment.setAppointmentTime(parseDateTime(event.appointmentTime()));
+                    appointment.setCreatedAt(parseDateTime(event.createdAt()));
                     appointmentRepository.save(appointment);
+                } else {
+                    Appointment appointment = new Appointment();
+                    appointment.setId(appointmentId);
+                    appointment.setPatient(patient.get());
+                    appointment.setHospital(hospital.get());
+                    appointment.setDoctor(doctor.get());
+                    appointment.setAppointmentTime(parseDateTime(event.appointmentTime()));
+                    appointment.setCreatedAt(parseDateTime(event.createdAt()));
+                    entityManager.persist(appointment);
                 }
-                log.info("Synced appointment {} into patient read model", event.appointmentId());
+                log.info("Synced appointment {} into patient read model", appointmentId);
             } catch (Exception ex) {
                 log.error("Failed to sync appointment.booked into patient read model", ex);
                 status.setRollbackOnly();
             }
             return null;
         });
+    }
+
+    /**
+     * Doctor row may be missing if doctor.registered was missed or arrived late; hydrate from appointment-service.
+     */
+    private Optional<Doctor> resolveDoctorForAppointmentBooked(AppointmentBookedEvent event) {
+        if (event.doctorId() == null) {
+            return Optional.empty();
+        }
+        Optional<Doctor> existing = doctorRepository.findById(event.doctorId());
+        if (existing.isPresent()) {
+            return existing;
+        }
+        Optional<DoctorReadModelSnapshot> snap = appointmentReadModelClient.fetchDoctorSnapshot(event.doctorId());
+        if (snap.isEmpty()) {
+            return Optional.empty();
+        }
+        DoctorReadModelSnapshot s = snap.get();
+        try {
+            Doctor d = new Doctor();
+            d.setId(s.id());
+            d.setEmail(s.email());
+            d.setName(s.name());
+            d.setSpecialization(s.specialization());
+            d.setExperience(s.experience());
+            d.setFee(s.fee());
+            d.setPassword(s.password());
+            if (s.hospitalId() != null) {
+                hospitalRepository.findById(s.hospitalId()).ifPresent(d::setHospital);
+            }
+            entityManager.persist(d);
+            entityManager.flush();
+            return doctorRepository.findById(event.doctorId());
+        } catch (Exception ex) {
+            log.warn("Failed to hydrate doctor {} from appointment-service: {}", event.doctorId(), ex.getMessage());
+            return Optional.empty();
+        }
     }
 
     @RabbitListener(queues = "${app.events.queues.patient-hospital-upserted}")
@@ -119,23 +169,21 @@ public class PatientReadModelEventListener {
         transactionTemplate.execute(status -> {
             try {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
-                Doctor doctor = findDoctor(event);
-                if (event.id() != null) {
-                    doctor.setId(event.id());
+                Long doctorId = event.id();
+                if (doctorId == null) {
+                    log.warn("Skipping doctor.registered sync: missing id for email={}", event.email());
+                    return null;
                 }
-                doctor.setName(event.name());
-                doctor.setSpecialization(event.specialization());
-                doctor.setExperience(event.experience());
-                doctor.setFee(event.fee());
-                doctor.setEmail(event.email());
-                doctor.setPassword(event.password());
-                if (event.hospitalId() != null) {
-                    hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
-                }
-                if (doctor.getId() != null) {
-                    entityManager.merge(doctor);
-                } else {
+
+                if (doctorRepository.existsById(doctorId)) {
+                    Doctor doctor = doctorRepository.findById(doctorId).orElseThrow();
+                    applyDoctorFromEvent(doctor, event);
                     doctorRepository.save(doctor);
+                } else {
+                    Doctor doctor = new Doctor();
+                    doctor.setId(doctorId);
+                    applyDoctorFromEvent(doctor, event);
+                    entityManager.persist(doctor);
                 }
                 log.info("Synced doctor {} (email={}) into patient read model", event.name(), event.email());
             } catch (Exception ex) {
@@ -144,6 +192,18 @@ public class PatientReadModelEventListener {
             }
             return null;
         });
+    }
+
+    private void applyDoctorFromEvent(Doctor doctor, DoctorRegisteredEvent event) {
+        doctor.setName(event.name());
+        doctor.setSpecialization(event.specialization());
+        doctor.setExperience(event.experience());
+        doctor.setFee(event.fee());
+        doctor.setEmail(event.email());
+        doctor.setPassword(event.password());
+        if (event.hospitalId() != null) {
+            hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
+        }
     }
 
     private Optional<Patient> findPatient(AppointmentBookedEvent event) {
@@ -157,13 +217,6 @@ public class PatientReadModelEventListener {
             return patientRepository.findByUhid(event.patientUhid());
         }
         return Optional.empty();
-    }
-
-    private Doctor findDoctor(DoctorRegisteredEvent event) {
-        if (event.id() != null) {
-            return doctorRepository.findById(event.id()).orElseGet(() -> doctorRepository.findByEmail(event.email()).orElseGet(Doctor::new));
-        }
-        return doctorRepository.findByEmail(event.email()).orElseGet(Doctor::new);
     }
 
     private void applyHospital(Hospital hospital, HospitalUpsertedEvent event) {
