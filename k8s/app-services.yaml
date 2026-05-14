@@ -16,7 +16,9 @@ kind: Deployment
 metadata:
   name: backend
 spec:
-  replicas: 1
+  replicas: 0
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend
@@ -38,6 +40,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8090"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
@@ -68,18 +72,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: jwt-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8090
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8090
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8090
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -100,6 +122,8 @@ metadata:
   name: auth-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: auth-service
@@ -121,6 +145,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8081"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
@@ -151,18 +177,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: jwt-secret
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8081
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8081
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8081
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -183,6 +227,8 @@ metadata:
   name: hospital-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: hospital-service
@@ -204,6 +250,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8084"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
@@ -229,18 +277,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: rabbitmq-password
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8084
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8084
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8084
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -282,6 +348,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8083"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
@@ -307,18 +375,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: rabbitmq-password
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8083
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8083
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -360,6 +446,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8082"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:
@@ -385,18 +473,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: rabbitmq-password
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8082
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8082
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -438,6 +544,8 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8086"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: SPRING_RABBITMQ_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -458,18 +566,36 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: spring-mail-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8086
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8086
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8086
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -511,23 +637,43 @@ spec:
           env:
             - name: SERVER_PORT
               value: "8080"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=55 -XX:+UseSerialGC"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: jwt-secret
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 640Mi
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
 ---
 apiVersion: v1
 kind: Service
@@ -569,9 +715,20 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
