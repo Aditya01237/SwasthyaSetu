@@ -1,0 +1,5 @@
+CREATE DATABASE auth_db;
+CREATE DATABASE patient_db;
+CREATE DATABASE provider_db;
+CREATE DATABASE appointment_db;
+CREATE DATABASE qr_db;
