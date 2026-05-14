@@ -28,7 +28,7 @@ pipeline {
         )
         booleanParam(
             name: 'PUBLISH_IMAGES',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Build and push app images to the configured Docker registry.'
         )
         booleanParam(
@@ -38,7 +38,7 @@ pipeline {
         )
         booleanParam(
             name: 'RUN_K8S_REGISTRY_DEPLOY',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Deploy published registry images to the configured Kubernetes context.'
         )
         booleanParam(
@@ -68,7 +68,7 @@ pipeline {
         )
         string(
             name: 'DOCKER_REGISTRY_CREDENTIALS_ID',
-            defaultValue: '',
+            defaultValue: 'swasthya-dockerhub',
             description: 'Jenkins username/password credentials ID for the Docker registry.'
         )
         booleanParam(
