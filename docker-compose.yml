@@ -172,6 +172,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+      PATIENT_SERVICE_URL: http://patient-service:8082
     ports:
       - "${APPOINTMENT_SERVICE_PORT:-8083}:8083"
     depends_on:
