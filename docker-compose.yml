@@ -50,9 +50,11 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.21
+    # Host ports default high to avoid "Bind for 0.0.0.0:1025 failed: port is already allocated" when
+    # another stack or local SMTP uses 1025. Apps still reach Mailpit at mailpit:1025 inside the network.
     ports:
-      - "${MAILPIT_SMTP_PORT:-1025}:1025"
-      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-11025}:1025"
+      - "${MAILPIT_UI_PORT:-18025}:8025"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8025/api/v1/info >/dev/null || exit 1"]
       interval: 10s
@@ -187,8 +189,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]
       interval: 15s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 15
+      start_period: 90s
 
   patient-service:
     build:
@@ -204,6 +207,9 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+      # Faster, quieter startup under full-stack compose (default true logs every SQL and slows I/O).
+      SPRING_JPA_SHOW_SQL: "false"
+      MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
     ports:
       - "${PATIENT_SERVICE_PORT:-8082}:8082"
     depends_on:
@@ -216,8 +222,9 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health || exit 1"]
       interval: 15s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 20
+      start_period: 120s
 
   notification-service:
     build:

@@ -4,124 +4,119 @@ pipeline {
     options {
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '20'))
-        timeout(time: 60, unit: 'MINUTES')
+        timeout(time: 90, unit: 'MINUTES')
     }
 
-    // CSE 816: Git push → Jenkins (requires Git plugin + GitHub plugin). On the job, also enable
-    // "GitHub hook trigger for GITScm polling" and add the repo webhook → http(s)://<jenkins>/github-webhook/
+    // CSE 816: enable "GitHub hook trigger for GITScm polling" on the job + GitHub webhook → …/github-webhook/
     triggers {
         githubPush()
     }
-
-    // All delivery stages run every build (no when-skips). Minikube, K8s registry, remote SSH, Ansible, and ELK
-    // are wrapped in catchError so missing tools/credentials mark UNSTABLE but the pipeline continues. Build Docker,
-    // Publish, and Deploy Local Compose are required to succeed (configure Docker Hub + agent Docker).
 
     parameters {
         booleanParam(
             name: 'RUN_DOCKER_BUILD',
             defaultValue: false,
-            description: 'Build all Docker images with docker compose after tests (can take a long time on first run). Leave off for fastest green CI when time-boxed; enable when you need a full local image build.'
+            description: 'docker compose build (main compose file only). Skipped when PUBLISH_IMAGES is true (publish script builds images).'
         )
         booleanParam(
             name: 'RUN_LOCAL_DEPLOY',
             defaultValue: true,
-            description: 'CSE 816: after publish, deploy on the Jenkins host with docker compose (turn off if you use only RUN_K8S_REGISTRY_DEPLOY or RUN_MINIKUBE_DEPLOY).'
+            description: 'After publish (or after compose build), deploy on the Jenkins host with scripts/ci/deploy-compose.sh.'
         )
         booleanParam(
             name: 'RUN_SERVICE_DB_SYNC',
             defaultValue: false,
-            description: 'When deploying locally, use service-owned databases and run the DB sync job.'
+            description: 'With local deploy: use docker-compose.service-dbs.yml and run the DB sync job.'
         )
         booleanParam(
             name: 'PUBLISH_IMAGES',
             defaultValue: true,
-            description: 'CSE 816: build and push app images to Docker Hub (requires Jenkins credential DOCKER_REGISTRY_CREDENTIALS_ID).'
+            description: 'Build and push images with scripts/ci/publish-images.sh (needs DOCKER_REGISTRY_CREDENTIALS_ID).'
         )
         booleanParam(
             name: 'RUN_MINIKUBE_DEPLOY',
             defaultValue: false,
-            description: 'Deploy the stack to local Minikube after a successful build.'
+            description: 'Run scripts/ci/deploy-minikube.sh (needs minikube + kubectl on the agent).'
         )
         booleanParam(
             name: 'RUN_K8S_REGISTRY_DEPLOY',
             defaultValue: false,
-            description: 'Deploy published registry images to the configured Kubernetes context. Enable only when this Jenkins agent has a valid kubectl context (otherwise the stage fails).'
-        )
-        booleanParam(
-            name: 'RUN_ANSIBLE_DEPLOY',
-            defaultValue: false,
-            description: 'Deploy published images to a remote Docker host with Ansible.'
-        )
-        booleanParam(
-            name: 'ANSIBLE_SETUP_DOCKER',
-            defaultValue: true,
-            description: 'When using Ansible deploy, install/start Docker on the remote host before deployment.'
-        )
-        string(
-            name: 'IMAGE_REPOSITORY_PREFIX',
-            defaultValue: 'docker.io/adityapareek01',
-            description: 'Registry namespace prefix, for example docker.io/user.'
-        )
-        string(
-            name: 'IMAGE_TAG',
-            defaultValue: '',
-            description: 'Image tag to publish. Leave empty to use the Git commit SHA.'
-        )
-        string(
-            name: 'DOCKER_REGISTRY_URL',
-            defaultValue: 'docker.io',
-            description: 'Registry host used for docker login, for Docker Hub use docker.io.'
-        )
-        string(
-            name: 'DOCKER_REGISTRY_CREDENTIALS_ID',
-            defaultValue: 'swasthya-dockerhub',
-            description: 'Jenkins username/password credentials ID for the Docker registry.'
+            description: 'Run scripts/ci/deploy-k8s-registry.sh (needs kubectl; requires PUBLISH_IMAGES). Mutually exclusive with RUN_MINIKUBE_DEPLOY.'
         )
         booleanParam(
             name: 'RUN_REMOTE_DEPLOY',
             defaultValue: false,
-            description: 'Deploy the pushed images on a remote Docker host over SSH.'
+            description: 'SSH deploy with scripts/ci/deploy-remote-compose.sh (requires PUBLISH_IMAGES and SSH credentials).'
+        )
+        booleanParam(
+            name: 'RUN_ANSIBLE_DEPLOY',
+            defaultValue: false,
+            description: 'Ansible deploy with scripts/ci/deploy-ansible.sh (requires PUBLISH_IMAGES; not with RUN_REMOTE_DEPLOY).'
+        )
+        booleanParam(
+            name: 'ANSIBLE_SETUP_DOCKER',
+            defaultValue: true,
+            description: 'When using Ansible deploy, install/start Docker on the target first.'
+        )
+        string(
+            name: 'IMAGE_REPOSITORY_PREFIX',
+            defaultValue: 'docker.io/adityapareek01',
+            description: 'Registry namespace prefix.'
+        )
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Image tag; empty = first 12 chars of Git SHA.'
+        )
+        string(
+            name: 'DOCKER_REGISTRY_URL',
+            defaultValue: 'docker.io',
+            description: 'Registry host for docker login.'
+        )
+        string(
+            name: 'DOCKER_REGISTRY_CREDENTIALS_ID',
+            defaultValue: 'swasthya-dockerhub',
+            description: 'Jenkins username/password credential ID for registry login.'
         )
         string(
             name: 'REMOTE_DEPLOY_HOST',
             defaultValue: '',
-            description: 'Remote server hostname or IP address.'
+            description: 'Remote host for RUN_REMOTE_DEPLOY.'
         )
         string(
             name: 'REMOTE_DEPLOY_USER',
             defaultValue: 'deploy',
-            description: 'Remote SSH user that can run Docker Compose.'
+            description: 'Remote SSH user.'
         )
         string(
             name: 'REMOTE_DEPLOY_PATH',
             defaultValue: 'swasthya-setu',
-            description: 'Remote deployment directory. Avoid spaces.'
+            description: 'Remote directory for compose deploy.'
         )
         string(
             name: 'REMOTE_SSH_CREDENTIALS_ID',
             defaultValue: '',
-            description: 'Jenkins SSH private key credentials ID for the remote server.'
+            description: 'Jenkins SSH private key credential ID (remote or Ansible).'
         )
         string(
             name: 'REMOTE_ENV_FILE_CREDENTIALS_ID',
             defaultValue: '',
-            description: 'Optional Jenkins secret file credentials ID for the remote .env file.'
+            description: 'Optional secret file credential for remote .env.'
         )
         string(
             name: 'ANSIBLE_INVENTORY_PATH',
             defaultValue: 'ansible/inventory.example.ini',
-            description: 'Inventory path for Ansible deploy when no secret inventory file is provided.'
+            description: 'Ansible inventory path when not using a secret inventory file.'
         )
         string(
             name: 'ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID',
             defaultValue: '',
-            description: 'Optional Jenkins secret file credentials ID for the Ansible inventory.'
+            description: 'Optional secret file credential for Ansible inventory.'
         )
         booleanParam(
             name: 'RUN_ELK_VERIFICATION',
             defaultValue: false,
-            description: 'CSE 816 / observability: start Elasticsearch, Logstash, and Kibana (Compose overlay), then run ELK health checks and a GELF smoke test into the swasthya-setu-logs-* index. Requires Docker on the Jenkins agent; can be memory-heavy.'
+            description: 'Run scripts/ci/check-elk-observability.sh (heavy; needs Docker + overlay compose).'
         )
     }
 
@@ -164,79 +159,23 @@ pipeline {
         }
 
         stage('Test Java Services') {
-            parallel {
-                stage('api-gateway') {
-                    steps {
-                        dir('services/api-gateway') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('auth-service') {
-                    steps {
-                        dir('services/auth-service') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('hospital-service') {
-                    steps {
-                        dir('services/hospital-service') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('appointment-service') {
-                    steps {
-                        dir('services/appointment-service') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('patient-service') {
-                    steps {
-                        dir('services/patient-service') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('notification-service') {
-                    steps {
-                        dir('services/notification-service') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
-                stage('backend') {
-                    steps {
-                        dir('services/backend') {
-                            sh 'mvn -B -q test'
-                        }
-                    }
-                }
+            steps {
+                sh 'sh scripts/ci/test-java-services.sh'
             }
         }
 
         stage('Build Frontends') {
-            parallel {
-                stage('patient-frontend') {
-                    steps {
-                        dir('swasthya-frontend') {
-                            retry(2) {
-                                sh 'npm ci'
-                                sh 'npm run build'
-                            }
-                        }
+            steps {
+                dir('swasthya-frontend') {
+                    retry(2) {
+                        sh 'npm ci'
+                        sh 'npm run build'
                     }
                 }
-                stage('doctor-frontend') {
-                    steps {
-                        dir('doctor-frontend') {
-                            retry(2) {
-                                sh 'npm ci'
-                                sh 'npm run build'
-                            }
-                        }
+                dir('doctor-frontend') {
+                    retry(2) {
+                        sh 'npm ci'
+                        sh 'npm run build'
                     }
                 }
             }
@@ -249,22 +188,28 @@ pipeline {
         }
 
         stage('Build Docker Images') {
+            when {
+                expression { params.RUN_DOCKER_BUILD && !params.PUBLISH_IMAGES }
+            }
             steps {
                 sh 'docker compose build'
             }
         }
 
         stage('Publish Docker Images') {
+            when {
+                expression { params.PUBLISH_IMAGES }
+            }
             steps {
                 script {
                     if (!params.DOCKER_REGISTRY_CREDENTIALS_ID?.trim()) {
-                        error 'DOCKER_REGISTRY_CREDENTIALS_ID is required for Publish Docker Images.'
+                        error 'DOCKER_REGISTRY_CREDENTIALS_ID is required when PUBLISH_IMAGES is true.'
                     }
                     if (!params.IMAGE_REPOSITORY_PREFIX?.trim()) {
-                        error 'IMAGE_REPOSITORY_PREFIX is required for Publish Docker Images.'
+                        error 'IMAGE_REPOSITORY_PREFIX is required when PUBLISH_IMAGES is true.'
                     }
                     if (!params.DOCKER_REGISTRY_URL?.trim()) {
-                        error 'DOCKER_REGISTRY_URL is required for Publish Docker Images.'
+                        error 'DOCKER_REGISTRY_URL is required when PUBLISH_IMAGES is true.'
                     }
 
                     def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
@@ -290,77 +235,93 @@ pipeline {
         }
 
         stage('Deploy Local Compose') {
+            when {
+                expression { params.RUN_LOCAL_DEPLOY }
+            }
             steps {
                 sh 'sh scripts/ci/deploy-compose.sh'
             }
         }
 
         stage('Deploy Minikube') {
+            when {
+                expression { params.RUN_MINIKUBE_DEPLOY }
+            }
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh 'sh scripts/ci/deploy-minikube.sh'
-                }
+                sh 'sh scripts/ci/deploy-minikube.sh'
             }
         }
 
         stage('Deploy Kubernetes Registry Images') {
+            when {
+                expression { params.RUN_K8S_REGISTRY_DEPLOY }
+            }
             steps {
                 script {
+                    if (!params.PUBLISH_IMAGES) {
+                        error 'RUN_K8S_REGISTRY_DEPLOY requires PUBLISH_IMAGES.'
+                    }
+                    if (params.RUN_MINIKUBE_DEPLOY) {
+                        error 'Use either RUN_MINIKUBE_DEPLOY or RUN_K8S_REGISTRY_DEPLOY, not both.'
+                    }
+
                     def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
 
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv([
-                            "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
-                            "IMAGE_TAG=${resolvedImageTag}",
-                            "K8S_NAMESPACE=${env.K8S_NAMESPACE}"
-                        ]) {
-                            sh 'sh scripts/ci/deploy-k8s-registry.sh'
-                        }
+                    withEnv([
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "K8S_NAMESPACE=${env.K8S_NAMESPACE}"
+                    ]) {
+                        sh 'sh scripts/ci/deploy-k8s-registry.sh'
                     }
                 }
             }
         }
 
         stage('Deploy Remote Compose') {
+            when {
+                expression { params.RUN_REMOTE_DEPLOY }
+            }
             steps {
                 script {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (!params.REMOTE_DEPLOY_HOST?.trim()) {
-                            error 'REMOTE_DEPLOY_HOST is not set; configure remote deploy or ignore this UNSTABLE stage.'
-                        }
-                        if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
-                            error 'REMOTE_SSH_CREDENTIALS_ID is not set; configure remote deploy or ignore this UNSTABLE stage.'
-                        }
-                        if (!params.REMOTE_DEPLOY_USER?.trim()) {
-                            error 'REMOTE_DEPLOY_USER is not set; configure remote deploy or ignore this UNSTABLE stage.'
-                        }
-                        if (!params.REMOTE_DEPLOY_PATH?.trim()) {
-                            error 'REMOTE_DEPLOY_PATH is not set; configure remote deploy or ignore this UNSTABLE stage.'
-                        }
+                    if (!params.PUBLISH_IMAGES) {
+                        error 'RUN_REMOTE_DEPLOY requires PUBLISH_IMAGES.'
+                    }
+                    if (!params.REMOTE_DEPLOY_HOST?.trim()) {
+                        error 'REMOTE_DEPLOY_HOST is required when RUN_REMOTE_DEPLOY is true.'
+                    }
+                    if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
+                        error 'REMOTE_SSH_CREDENTIALS_ID is required when RUN_REMOTE_DEPLOY is true.'
+                    }
+                    if (!params.REMOTE_DEPLOY_USER?.trim()) {
+                        error 'REMOTE_DEPLOY_USER is required when RUN_REMOTE_DEPLOY is true.'
+                    }
+                    if (!params.REMOTE_DEPLOY_PATH?.trim()) {
+                        error 'REMOTE_DEPLOY_PATH is required when RUN_REMOTE_DEPLOY is true.'
+                    }
 
-                        def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                        def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
-                        def remoteEnv = [
-                            "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
-                            "IMAGE_TAG=${resolvedImageTag}",
-                            "RUN_SERVICE_DB_SYNC=${params.RUN_SERVICE_DB_SYNC}",
-                            "REMOTE_DEPLOY_HOST=${params.REMOTE_DEPLOY_HOST.trim()}",
-                            "REMOTE_DEPLOY_USER=${params.REMOTE_DEPLOY_USER.trim()}",
-                            "REMOTE_DEPLOY_PATH=${params.REMOTE_DEPLOY_PATH.trim()}"
-                        ]
+                    def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
+                    def remoteEnv = [
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "RUN_SERVICE_DB_SYNC=${params.RUN_SERVICE_DB_SYNC}",
+                        "REMOTE_DEPLOY_HOST=${params.REMOTE_DEPLOY_HOST.trim()}",
+                        "REMOTE_DEPLOY_USER=${params.REMOTE_DEPLOY_USER.trim()}",
+                        "REMOTE_DEPLOY_PATH=${params.REMOTE_DEPLOY_PATH.trim()}"
+                    ]
 
-                        sshagent(credentials: [params.REMOTE_SSH_CREDENTIALS_ID.trim()]) {
-                            if (params.REMOTE_ENV_FILE_CREDENTIALS_ID?.trim()) {
-                                withCredentials([file(credentialsId: params.REMOTE_ENV_FILE_CREDENTIALS_ID.trim(), variable: 'REMOTE_ENV_FILE')]) {
-                                    withEnv(remoteEnv) {
-                                        sh 'sh scripts/ci/deploy-remote-compose.sh'
-                                    }
-                                }
-                            } else {
+                    sshagent(credentials: [params.REMOTE_SSH_CREDENTIALS_ID.trim()]) {
+                        if (params.REMOTE_ENV_FILE_CREDENTIALS_ID?.trim()) {
+                            withCredentials([file(credentialsId: params.REMOTE_ENV_FILE_CREDENTIALS_ID.trim(), variable: 'REMOTE_ENV_FILE')]) {
                                 withEnv(remoteEnv) {
                                     sh 'sh scripts/ci/deploy-remote-compose.sh'
                                 }
+                            }
+                        } else {
+                            withEnv(remoteEnv) {
+                                sh 'sh scripts/ci/deploy-remote-compose.sh'
                             }
                         }
                     }
@@ -369,57 +330,64 @@ pipeline {
         }
 
         stage('Deploy With Ansible') {
+            when {
+                expression { params.RUN_ANSIBLE_DEPLOY }
+            }
             steps {
                 script {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
-                            error 'REMOTE_SSH_CREDENTIALS_ID is not set; configure Ansible deploy or ignore this UNSTABLE stage.'
-                        }
-                        if (!params.ANSIBLE_INVENTORY_PATH?.trim() && !params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
-                            error 'ANSIBLE_INVENTORY_PATH or ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID is required for Ansible deploy.'
-                        }
+                    if (!params.PUBLISH_IMAGES) {
+                        error 'RUN_ANSIBLE_DEPLOY requires PUBLISH_IMAGES.'
+                    }
+                    if (params.RUN_REMOTE_DEPLOY) {
+                        error 'Use either RUN_REMOTE_DEPLOY or RUN_ANSIBLE_DEPLOY, not both.'
+                    }
+                    if (!params.REMOTE_SSH_CREDENTIALS_ID?.trim()) {
+                        error 'REMOTE_SSH_CREDENTIALS_ID is required when RUN_ANSIBLE_DEPLOY is true.'
+                    }
+                    if (!params.ANSIBLE_INVENTORY_PATH?.trim() && !params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                        error 'ANSIBLE_INVENTORY_PATH or ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID is required when RUN_ANSIBLE_DEPLOY is true.'
+                    }
 
-                        def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                        def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
-                        def ansibleEnv = [
-                            "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
-                            "IMAGE_TAG=${resolvedImageTag}",
-                            "RUN_SERVICE_DB_SYNC=${params.RUN_SERVICE_DB_SYNC}",
-                            "REMOTE_DEPLOY_PATH=${params.REMOTE_DEPLOY_PATH.trim()}",
-                            "ANSIBLE_SETUP_DOCKER=${params.ANSIBLE_SETUP_DOCKER}",
-                            "DOCKER_REGISTRY_URL=${params.DOCKER_REGISTRY_URL.trim()}"
-                        ]
+                    def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
+                    def ansibleEnv = [
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "RUN_SERVICE_DB_SYNC=${params.RUN_SERVICE_DB_SYNC}",
+                        "REMOTE_DEPLOY_PATH=${params.REMOTE_DEPLOY_PATH.trim()}",
+                        "ANSIBLE_SETUP_DOCKER=${params.ANSIBLE_SETUP_DOCKER}",
+                        "DOCKER_REGISTRY_URL=${params.DOCKER_REGISTRY_URL.trim()}"
+                    ]
 
-                        sshagent(credentials: [params.REMOTE_SSH_CREDENTIALS_ID.trim()]) {
-                            withCredentials([usernamePassword(
-                                credentialsId: params.DOCKER_REGISTRY_CREDENTIALS_ID.trim(),
-                                usernameVariable: 'REGISTRY_USERNAME',
-                                passwordVariable: 'REGISTRY_PASSWORD'
-                            )]) {
-                                if (params.REMOTE_ENV_FILE_CREDENTIALS_ID?.trim()) {
-                                    withCredentials([file(credentialsId: params.REMOTE_ENV_FILE_CREDENTIALS_ID.trim(), variable: 'REMOTE_ENV_FILE')]) {
-                                        if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
-                                            withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
-                                                withEnv(ansibleEnv) {
-                                                    sh 'sh scripts/ci/deploy-ansible.sh'
-                                                }
-                                            }
-                                        } else {
-                                            withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
+                    sshagent(credentials: [params.REMOTE_SSH_CREDENTIALS_ID.trim()]) {
+                        withCredentials([usernamePassword(
+                            credentialsId: params.DOCKER_REGISTRY_CREDENTIALS_ID.trim(),
+                            usernameVariable: 'REGISTRY_USERNAME',
+                            passwordVariable: 'REGISTRY_PASSWORD'
+                        )]) {
+                            if (params.REMOTE_ENV_FILE_CREDENTIALS_ID?.trim()) {
+                                withCredentials([file(credentialsId: params.REMOTE_ENV_FILE_CREDENTIALS_ID.trim(), variable: 'REMOTE_ENV_FILE')]) {
+                                    if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                                        withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
+                                            withEnv(ansibleEnv) {
                                                 sh 'sh scripts/ci/deploy-ansible.sh'
                                             }
                                         }
-                                    }
-                                } else if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
-                                    withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
-                                        withEnv(ansibleEnv) {
+                                    } else {
+                                        withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
                                             sh 'sh scripts/ci/deploy-ansible.sh'
                                         }
                                     }
-                                } else {
-                                    withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
+                                }
+                            } else if (params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID?.trim()) {
+                                withCredentials([file(credentialsId: params.ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID.trim(), variable: 'ANSIBLE_INVENTORY_FILE')]) {
+                                    withEnv(ansibleEnv) {
                                         sh 'sh scripts/ci/deploy-ansible.sh'
                                     }
+                                }
+                            } else {
+                                withEnv(ansibleEnv + ["ANSIBLE_INVENTORY=${params.ANSIBLE_INVENTORY_PATH.trim()}"]) {
+                                    sh 'sh scripts/ci/deploy-ansible.sh'
                                 }
                             }
                         }
@@ -429,10 +397,11 @@ pipeline {
         }
 
         stage('ELK observability verification') {
+            when {
+                expression { params.RUN_ELK_VERIFICATION }
+            }
             steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh 'sh scripts/ci/check-elk-observability.sh'
-                }
+                sh 'sh scripts/ci/check-elk-observability.sh'
             }
         }
     }

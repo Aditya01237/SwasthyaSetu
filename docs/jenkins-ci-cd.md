@@ -25,7 +25,7 @@ This repository uses the root `Jenkinsfile` for build, test, image build, option
 
 ### CSE 816 default pipeline (push → build)
 
-With the current `Jenkinsfile` defaults, a **Git push** (webhook + `githubPush()` trigger) runs **Validate → tests → frontends → AI check → publish to Docker Hub → deploy on the Jenkins host** (`RUN_LOCAL_DEPLOY`). Create Jenkins credentials **`swasthya-dockerhub`** (username + access token) before relying on defaults. For **Kubernetes-only** deploy, turn **`RUN_LOCAL_DEPLOY`** off and **`RUN_K8S_REGISTRY_DEPLOY`** on (needs `kubectl` context). **ELK** is optional in CI; enable **`RUN_ELK_VERIFICATION`** when you need the automated ELK smoke path. **`RUN_DOCKER_BUILD`** stays off when publishing (images are built during the publish stage).
+With the current `Jenkinsfile` defaults, a **Git push** runs **Validate → Java tests (`scripts/ci/test-java-services.sh`) → sequential frontends → AI check → publish → local Compose deploy** when **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** are on. **Minikube, K8s registry, remote SSH, Ansible, and ELK** run only when their parameters are enabled (otherwise those stages are **skipped**). Create Jenkins credentials **`swasthya-dockerhub`** before publishing. For **Kubernetes-only** deploy, turn **`RUN_LOCAL_DEPLOY`** off and **`RUN_K8S_REGISTRY_DEPLOY`** on. Use **`RUN_DOCKER_BUILD`** only for a standalone **`docker compose build`** when **`PUBLISH_IMAGES`** is off (publish already builds images).
 
 For a **tests-only** run (no Hub, no deploy), disable **`PUBLISH_IMAGES`** and **`RUN_LOCAL_DEPLOY`** in **Build with Parameters**.
 
@@ -54,7 +54,7 @@ Create these credentials in Jenkins before enabling publishing or remote deploy:
 
 ## Pipeline Parameters
 
-- `RUN_DOCKER_BUILD`: builds all service and frontend Docker images after tests pass.
+- `RUN_DOCKER_BUILD`: optional `docker compose build` when **not** publishing (skipped when `PUBLISH_IMAGES` is true).
 - `RUN_LOCAL_DEPLOY`: runs Docker Compose on the Jenkins host after a successful build.
 - `RUN_SERVICE_DB_SYNC`: deploys with `docker-compose.service-dbs.yml` and seeds `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
 - `PUBLISH_IMAGES`: builds and pushes app/frontend images to a registry using `docker-compose.images.yml`.
