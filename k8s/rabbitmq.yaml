@@ -1,4 +1,12 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+data:
+  20-local-memory.conf: |
+    vm_memory_high_watermark.relative = 0.8
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: rabbitmq
@@ -20,6 +28,8 @@ metadata:
   name: rabbitmq
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: rabbitmq
@@ -28,6 +38,21 @@ spec:
       labels:
         app: rabbitmq
     spec:
+      securityContext:
+        fsGroup: 101
+      initContainers:
+        - name: rabbitmq-data-permissions
+          image: rabbitmq:3-management-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - chown -R 100:101 /var/lib/rabbitmq && chmod 700 /var/lib/rabbitmq
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
@@ -49,22 +74,34 @@ spec:
                   name: swasthya-secrets
                   key: rabbitmq-password
           readinessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - ping
-            initialDelaySeconds: 15
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
-            exec:
-              command:
-                - rabbitmq-diagnostics
-                - ping
-            initialDelaySeconds: 30
+            tcpSocket:
+              port: amqp
+            initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            tcpSocket:
+              port: amqp
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
           volumeMounts:
+            - name: rabbitmq-config
+              mountPath: /etc/rabbitmq/conf.d/20-local-memory.conf
+              subPath: 20-local-memory.conf
             - name: rabbitmq-data
               mountPath: /var/lib/rabbitmq
       volumes:
+        - name: rabbitmq-config
+          configMap:
+            name: rabbitmq-config
         - name: rabbitmq-data
           emptyDir: {}

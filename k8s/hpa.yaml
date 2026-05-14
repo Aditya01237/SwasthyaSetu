@@ -2,6 +2,8 @@
 # Horizontal Pod Autoscalers for SwasthyaSetu microservices
 # Requires: metrics-server installed in the cluster
 # Enable in minikube with: minikube addons enable metrics-server
+# NOTE: maxReplicas is set to 1 for local Minikube to prevent CPU-spike
+# scale-outs from overloading the single node during Spring Boot startup.
 
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -14,20 +16,20 @@ spec:
     kind: Deployment
     name: api-gateway
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 80
     - type: Resource
       resource:
         name: memory
         target:
           type: Utilization
-          averageUtilization: 70
+          averageUtilization: 80
 
 ---
 apiVersion: autoscaling/v2
@@ -41,14 +43,14 @@ spec:
     kind: Deployment
     name: auth-service
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 80
 
 ---
 apiVersion: autoscaling/v2
@@ -62,14 +64,14 @@ spec:
     kind: Deployment
     name: appointment-service
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 80
 
 ---
 apiVersion: autoscaling/v2
@@ -83,11 +85,11 @@ spec:
     kind: Deployment
     name: patient-service
   minReplicas: 1
-  maxReplicas: 3
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 60
+          averageUtilization: 80

@@ -30,6 +30,14 @@ spec:
         - name: postgres
           image: postgres:16-alpine
           imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              if [ -s "$PGDATA/PG_VERSION" ] && ! grep -Eq '^host[[:space:]]+all[[:space:]]+all[[:space:]]+0\.0\.0\.0/0[[:space:]]+scram-sha-256' "$PGDATA/pg_hba.conf"; then
+                echo 'host all all 0.0.0.0/0 scram-sha-256' >> "$PGDATA/pg_hba.conf"
+              fi
+              exec docker-entrypoint.sh postgres
           ports:
             - name: postgres
               containerPort: 5432
@@ -49,6 +57,8 @@ spec:
                 secretKeyRef:
                   name: swasthya-secrets
                   key: postgres-password
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           readinessProbe:
@@ -59,14 +69,27 @@ spec:
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             exec:
               command:
                 - sh
                 - -c
                 - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 36
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

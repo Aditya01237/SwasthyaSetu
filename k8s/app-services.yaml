@@ -327,6 +327,8 @@ metadata:
   name: appointment-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: appointment-service
@@ -425,6 +427,8 @@ metadata:
   name: patient-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: patient-service
@@ -523,6 +527,8 @@ metadata:
   name: notification-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: notification-service
@@ -616,6 +622,8 @@ metadata:
   name: api-gateway
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: api-gateway
