@@ -25,6 +25,20 @@ spec:
       labels:
         app: swasthya-frontend
     spec:
+      initContainers:
+        - name: wait-for-api-gateway
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for api-gateway DNS..."
+              until nslookup api-gateway.swasthya-setu.svc.cluster.local > /dev/null 2>&1; do
+                echo "api-gateway not yet resolvable, sleeping 3s..."
+                sleep 3
+              done
+              echo "api-gateway is resolvable, starting nginx."
       containers:
         - name: swasthya-frontend
           image: swasthya-setu-swasthya-frontend:latest
@@ -32,6 +46,13 @@ spec:
           ports:
             - name: http
               containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
           readinessProbe:
             httpGet:
               path: /patient/
@@ -72,6 +93,20 @@ spec:
       labels:
         app: doctor-frontend
     spec:
+      initContainers:
+        - name: wait-for-api-gateway
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for api-gateway DNS..."
+              until nslookup api-gateway.swasthya-setu.svc.cluster.local > /dev/null 2>&1; do
+                echo "api-gateway not yet resolvable, sleeping 3s..."
+                sleep 3
+              done
+              echo "api-gateway is resolvable, starting nginx."
       containers:
         - name: doctor-frontend
           image: swasthya-setu-doctor-frontend:latest
@@ -79,6 +114,13 @@ spec:
           ports:
             - name: http
               containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
           readinessProbe:
             httpGet:
               path: /doctor/

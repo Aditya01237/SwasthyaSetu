@@ -97,6 +97,13 @@ spec:
               mountPath: /docker-entrypoint-initdb.d/10-create-service-dbs.sh
               subPath: 10-create-service-dbs.sh
               readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
       volumes:
         - name: postgres-init-scripts
           configMap:
