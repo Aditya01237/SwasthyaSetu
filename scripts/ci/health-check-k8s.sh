@@ -2,9 +2,10 @@
 set -eu
 
 NAMESPACE="${K8S_NAMESPACE:-swasthya-setu}"
-ROLLOUT_TIMEOUT="${K8S_ROLLOUT_TIMEOUT:-360s}"
+ROLLOUT_TIMEOUT="${K8S_ROLLOUT_TIMEOUT:-600s}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-60}"
 HEALTH_SLEEP_SECONDS="${HEALTH_SLEEP_SECONDS:-2}"
+K8S_INCLUDE_LEGACY_BACKEND="${K8S_INCLUDE_LEGACY_BACKEND:-false}"
 
 GATEWAY_FORWARD_PORT="${K8S_GATEWAY_FORWARD_PORT:-28080}"
 AUTH_FORWARD_PORT="${K8S_AUTH_FORWARD_PORT:-28081}"
@@ -67,19 +68,40 @@ start_port_forward() {
   sleep 1
 }
 
+sync_service_databases() {
+  kubectl -n "$NAMESPACE" exec postgres-0 -- sh -c '
+    set -eu
+    for db in swasthyasetudb auth_db patient_db appointment_db hospital_db; do
+      exists="$(psql -U "$POSTGRES_USER" -d template1 -Atc "SELECT 1 FROM pg_database WHERE datname = '\''$db'\''")"
+      if [ "$exists" != "1" ]; then
+        psql -U "$POSTGRES_USER" -d template1 -c "CREATE DATABASE $db"
+      fi
+    done
+  '
+}
+
 require_command kubectl
 require_command curl
 
 echo "Waiting for Kubernetes workloads in namespace: $NAMESPACE"
 
 kubectl -n "$NAMESPACE" rollout status statefulset/postgres --timeout="$ROLLOUT_TIMEOUT"
+sync_service_databases
 
 for deployment in \
   redis \
   rabbitmq \
   mailpit \
-  ai-service \
-  backend \
+  ai-service
+do
+  kubectl -n "$NAMESPACE" rollout status "deployment/$deployment" --timeout="$ROLLOUT_TIMEOUT"
+done
+
+if [ "$K8S_INCLUDE_LEGACY_BACKEND" = "true" ]; then
+  kubectl -n "$NAMESPACE" rollout status deployment/backend --timeout="$ROLLOUT_TIMEOUT"
+fi
+
+for deployment in \
   auth-service \
   hospital-service \
   patient-service \
@@ -94,7 +116,9 @@ done
 
 echo "Opening temporary service port-forwards..."
 start_port_forward ai-service "$AI_FORWARD_PORT" 8000
-start_port_forward backend "$BACKEND_FORWARD_PORT" 8090
+if [ "$K8S_INCLUDE_LEGACY_BACKEND" = "true" ]; then
+  start_port_forward backend "$BACKEND_FORWARD_PORT" 8090
+fi
 start_port_forward auth-service "$AUTH_FORWARD_PORT" 8081
 start_port_forward patient-service "$PATIENT_FORWARD_PORT" 8082
 start_port_forward appointment-service "$APPOINTMENT_FORWARD_PORT" 8083
@@ -105,7 +129,9 @@ start_port_forward swasthya-frontend "$PATIENT_FRONTEND_FORWARD_PORT" 80
 start_port_forward doctor-frontend "$DOCTOR_FRONTEND_FORWARD_PORT" 80
 
 wait_for_url "AI service" "http://localhost:$AI_FORWARD_PORT/health"
-wait_for_url "Backend" "http://localhost:$BACKEND_FORWARD_PORT/actuator/health"
+if [ "$K8S_INCLUDE_LEGACY_BACKEND" = "true" ]; then
+  wait_for_url "Backend" "http://localhost:$BACKEND_FORWARD_PORT/actuator/health"
+fi
 wait_for_url "Auth service" "http://localhost:$AUTH_FORWARD_PORT/actuator/health"
 wait_for_url "Patient service" "http://localhost:$PATIENT_FORWARD_PORT/actuator/health"
 wait_for_url "Appointment service" "http://localhost:$APPOINTMENT_FORWARD_PORT/actuator/health"
