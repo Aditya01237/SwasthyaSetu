@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swasthya-frontend-deployment
+  namespace: swasthya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swasthya-frontend
+  template:
+    metadata:
+      labels:
+        app: swasthya-frontend
+    spec:
+      containers:
+      - name: swasthya-frontend
+        image: swasthya-frontend:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swasthya-frontend
+  namespace: swasthya
+spec:
+  selector:
+    app: swasthya-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort

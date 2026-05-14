@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qr-service-deployment
+  namespace: swasthya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qr-service
+  template:
+    metadata:
+      labels:
+        app: qr-service
+    spec:
+      containers:
+      - name: qr-service
+        image: qr-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8086
+        env:
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://eureka-server:8761/eureka/"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres-server:5432/qr_db"
+        - name: SPRING_RABBITMQ_HOST
+          value: "rabbitmq-server"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qr-service
+  namespace: swasthya
+spec:
+  selector:
+    app: qr-service
+  ports:
+    - protocol: TCP
+      port: 8086
+      targetPort: 8086

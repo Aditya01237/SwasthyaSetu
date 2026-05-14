@@ -1,0 +1,19 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: patient-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/swasthya_patient
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+  rabbitmq:
+    host: localhost
+    port: 5672
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/

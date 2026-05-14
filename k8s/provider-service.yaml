@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-service-deployment
+  namespace: swasthya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: provider-service
+  template:
+    metadata:
+      labels:
+        app: provider-service
+    spec:
+      containers:
+      - name: provider-service
+        image: provider-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8084
+        env:
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://eureka-server:8761/eureka/"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres-server:5432/provider_db"
+        - name: SPRING_RABBITMQ_HOST
+          value: "rabbitmq-server"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provider-service
+  namespace: swasthya
+spec:
+  selector:
+    app: provider-service
+  ports:
+    - protocol: TCP
+      port: 8084
+      targetPort: 8084

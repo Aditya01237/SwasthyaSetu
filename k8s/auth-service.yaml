@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service-deployment
+  namespace: swasthya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: auth-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8082
+        env:
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          value: "http://eureka-server:8761/eureka/"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:postgresql://postgres-server:5432/auth_db"
+        - name: SPRING_RABBITMQ_HOST
+          value: "rabbitmq-server"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: swasthya
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082

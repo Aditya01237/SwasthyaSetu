@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  postgres-server:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-dbs.sql:/docker-entrypoint-initdb.d/init-dbs.sql
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - swasthya-network
+
+  rabbitmq-server:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - swasthya-network
+
+  eureka-server:
+    build: ./eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - swasthya-network
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8081:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    networks:
+      - swasthya-network
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8082:8082"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-server:5432/auth_db
+      - SPRING_RABBITMQ_HOST=rabbitmq-server
+    depends_on:
+      - eureka-server
+      - postgres-server
+    networks:
+      - swasthya-network
+
+  patient-service:
+    build: ./patient-service
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-server:5432/patient_db
+      - SPRING_RABBITMQ_HOST=rabbitmq-server
+    depends_on:
+      - eureka-server
+      - postgres-server
+      - rabbitmq-server
+    networks:
+      - swasthya-network
+
+  provider-service:
+    build: ./provider-service
+    ports:
+      - "8084:8084"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-server:5432/provider_db
+      - SPRING_RABBITMQ_HOST=rabbitmq-server
+    depends_on:
+      - eureka-server
+      - postgres-server
+    networks:
+      - swasthya-network
+
+  appointment-service:
+    build: ./appointment-service
+    ports:
+      - "8085:8085"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-server:5432/appointment_db
+      - SPRING_RABBITMQ_HOST=rabbitmq-server
+    depends_on:
+      - eureka-server
+      - postgres-server
+    networks:
+      - swasthya-network
+
+  qr-service:
+    build: ./qr-service
+    ports:
+      - "8086:8086"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-server:5432/qr_db
+      - SPRING_RABBITMQ_HOST=rabbitmq-server
+    depends_on:
+      - eureka-server
+      - postgres-server
+      - rabbitmq-server
+    networks:
+      - swasthya-network
+
+  swasthya-frontend:
+    build: ./swasthya-frontend
+    ports:
+      - "5173:80"
+    networks:
+      - swasthya-network
+
+  doctor-frontend:
+    build: ./doctor-frontend
+    ports:
+      - "5174:80"
+    networks:
+      - swasthya-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    networks:
+      - swasthya-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.2
+    ports:
+      - "5044:5044"
+    networks:
+      - swasthya-network
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    ports:
+      - "5601:5601"
+    networks:
+      - swasthya-network
+    depends_on:
+      - elasticsearch
+
+networks:
+  swasthya-network:
+    driver: bridge
+
+volumes:
+  pgdata:
