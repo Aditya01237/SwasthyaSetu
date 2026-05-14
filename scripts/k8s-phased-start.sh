@@ -46,6 +46,8 @@ scale_and_wait() {
   info "Scaling $name to $replicas..."
   $KUBECTL scale deployment "$name" -n "$NS" --replicas="$replicas" 2>/dev/null || true
   wait_ready deployment "$name" "$max_wait"
+  info "Giving $name 20s to stay stable..."
+  sleep 20
 }
 
 # ─── Phase 0: Reset everything to 0 replicas ────────────────────────────────
@@ -71,8 +73,8 @@ scale_and_wait redis 1 120
 # RabbitMQ (needs longer — AMQP broker boots slowly)
 scale_and_wait rabbitmq 1 240
 
-# Mailpit (lightweight)
-scale_and_wait mailpit 1 60
+# Mailpit (lightweight but needs time after scale-from-zero)
+scale_and_wait mailpit 1 120
 
 ok "Infrastructure layer healthy"
 
