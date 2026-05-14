@@ -78,7 +78,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -183,7 +183,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -283,7 +283,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -383,7 +383,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -483,7 +483,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -578,7 +578,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -658,7 +658,7 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              memory: 640Mi
+              memory: "400Mi"
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
@@ -740,3 +740,8 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 18
+          resources:
+            requests:
+              memory: "64Mi"
+            limits:
+              memory: "256Mi"

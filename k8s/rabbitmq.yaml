@@ -5,7 +5,7 @@ metadata:
 data:
   20-local-memory.conf: |
     vm_memory_high_watermark.absolute = 256MB
-    total_memory_available_override_value = 512MB
+    total_memory_available_override_value = 400MB
 ---
 apiVersion: v1
 kind: Service
@@ -100,7 +100,7 @@ spec:
               memory: 128Mi
             limits:
               cpu: "1"
-              memory: 300Mi
+              memory: 400Mi
           volumeMounts:
             - name: rabbitmq-config
               mountPath: /etc/rabbitmq/conf.d/20-local-memory.conf
