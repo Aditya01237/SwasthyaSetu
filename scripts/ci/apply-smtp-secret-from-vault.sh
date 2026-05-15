@@ -33,6 +33,12 @@ kubectl set env deployment/notification-service \
   -n "$NS"
 
 kubectl rollout restart deployment/notification-service -n "$NS"
-kubectl rollout status deployment/notification-service -n "$NS"
+kubectl rollout status deployment/notification-service -n "$NS" --timeout=180s || {
+  echo "notification-service rollout did not finish in time; showing debug info"
+  kubectl get pods -n "$NS" -l app=notification-service
+  kubectl describe deployment notification-service -n "$NS" || true
+  kubectl logs deployment/notification-service -n "$NS" --tail=100 || true
+  exit 1
+}
 
 echo "SMTP secret applied to notification-service"
