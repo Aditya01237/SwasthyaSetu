@@ -1,0 +1,20 @@
+---
+- name: Deploy Kubernetes manifests using registry images
+  shell: sh scripts/ci/deploy-k8s-registry.sh
+  args:
+    chdir: "{{ project_root }}"
+  environment:
+    IMAGE_REPOSITORY_PREFIX: "{{ image_repository_prefix }}"
+    IMAGE_TAG: "{{ image_tag }}"
+    DOCKER_REGISTRY_URL: "{{ docker_registry_url }}"
+    K8S_NAMESPACE: "{{ k8s_namespace }}"
+    K8S_RUN_HEALTH_CHECK: "false"
+
+- name: Show Kubernetes deployment status
+  shell: kubectl get deployments,pods,svc -n "{{ k8s_namespace }}"
+  register: k8s_status
+  changed_when: false
+
+- name: Print Kubernetes status
+  debug:
+    var: k8s_status.stdout_lines

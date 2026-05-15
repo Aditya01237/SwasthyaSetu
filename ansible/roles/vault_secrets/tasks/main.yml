@@ -1,0 +1,9 @@
+---
+- name: Apply SMTP secrets from Vault to Kubernetes
+  shell: sh scripts/ci/apply-smtp-secret-from-vault.sh
+  args:
+    chdir: "{{ project_root }}"
+  environment:
+    VAULT_ADDR: "{{ vault_addr }}"
+    VAULT_TOKEN: "{{ vault_token }}"
+    K8S_NAMESPACE: "{{ k8s_namespace }}"
