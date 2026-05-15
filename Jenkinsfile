@@ -12,45 +12,10 @@ pipeline {
     }
 
     parameters {
-        booleanParam(
-            name: 'RUN_DOCKER_BUILD',
-            defaultValue: false,
-            description: 'Compatibility flag. Docker image build stage currently runs in the main CI path.'
-        )
-        booleanParam(
-            name: 'RUN_SERVICE_DB_SYNC',
-            defaultValue: false,
-            description: 'Compatibility flag for older Compose-based Ansible deployment.'
-        )
-        booleanParam(
-            name: 'PUBLISH_IMAGES',
-            defaultValue: true,
-            description: 'Compatibility flag. Publish Docker Images stage currently runs in the main CI path.'
-        )
-        booleanParam(
-            name: 'RUN_MINIKUBE_DEPLOY',
-            defaultValue: false,
-            description: 'Run the direct local Minikube deployment stage.'
-        )
-        booleanParam(
-            name: 'RUN_K8S_REGISTRY_DEPLOY',
-            defaultValue: false,
-            description: 'Deploy Kubernetes manifests directly using images pulled from the configured registry.'
-        )
-        booleanParam(
-            name: 'RUN_ANSIBLE_DEPLOY',
-            defaultValue: false,
-            description: 'Run Ansible-based local Minikube Kubernetes deployment.'
-        )
-        booleanParam(
-            name: 'ANSIBLE_SETUP_DOCKER',
-            defaultValue: true,
-            description: 'Compatibility flag for older remote Ansible deployment.'
-        )
         string(
             name: 'IMAGE_REPOSITORY_PREFIX',
             defaultValue: 'docker.io/adityapareek01',
-            description: 'Registry namespace prefix.'
+            description: 'Docker Hub registry namespace prefix.'
         )
         string(
             name: 'IMAGE_TAG',
@@ -60,50 +25,22 @@ pipeline {
         string(
             name: 'DOCKER_REGISTRY_URL',
             defaultValue: 'docker.io',
-            description: 'Registry host for docker login.'
+            description: 'Docker registry host for docker login.'
         )
         string(
             name: 'DOCKER_REGISTRY_CREDENTIALS_ID',
             defaultValue: 'swasthya-dockerhub',
-            description: 'Jenkins username/password credential ID for registry login.'
-        )
-        string(
-            name: 'REMOTE_DEPLOY_PATH',
-            defaultValue: 'swasthya-setu',
-            description: 'Compatibility parameter for older remote Compose deployment.'
-        )
-        string(
-            name: 'REMOTE_SSH_CREDENTIALS_ID',
-            defaultValue: '',
-            description: 'Compatibility parameter for older remote Ansible deployment.'
-        )
-        string(
-            name: 'REMOTE_ENV_FILE_CREDENTIALS_ID',
-            defaultValue: '',
-            description: 'Compatibility parameter for older remote Ansible deployment.'
-        )
-        string(
-            name: 'ANSIBLE_INVENTORY_PATH',
-            defaultValue: 'ansible/inventory.example.ini',
-            description: 'Compatibility parameter for older remote Ansible deployment.'
-        )
-        string(
-            name: 'ANSIBLE_INVENTORY_FILE_CREDENTIALS_ID',
-            defaultValue: '',
-            description: 'Compatibility parameter for older remote Ansible deployment.'
-        )
-        booleanParam(
-            name: 'RUN_ELK_VERIFICATION',
-            defaultValue: false,
-            description: 'Run ELK observability verification stage.'
+            description: 'Jenkins username/password credential ID for Docker Hub login.'
         )
     }
 
     environment {
         PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
         COMPOSE_PROJECT_NAME = 'swasthya-setu-ci'
         COMPOSE_DOCKER_CLI_BUILD = '1'
         DOCKER_BUILDKIT = '1'
+
         MINIKUBE_PROFILE = 'minikube'
         K8S_NAMESPACE = 'swasthya-setu'
 
@@ -297,70 +234,21 @@ pipeline {
             }
         }
 
-        stage('Deploy Minikube') {
-            when {
-                expression { return params.RUN_MINIKUBE_DEPLOY }
-            }
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh 'sh scripts/ci/deploy-minikube.sh'
-                }
-            }
-        }
-
-        stage('Deploy Kubernetes Registry Images') {
-            when {
-                expression { return params.RUN_K8S_REGISTRY_DEPLOY }
-            }
-            steps {
-                script {
-                    def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                    def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
-
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv([
-                            "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
-                            "IMAGE_TAG=${resolvedImageTag}",
-                            "K8S_NAMESPACE=${env.K8S_NAMESPACE}"
-                        ]) {
-                            sh 'sh scripts/ci/deploy-k8s-registry.sh'
-                        }
-                    }
-                }
-            }
-        }
-
         stage('Deploy Local Minikube With Ansible') {
-            when {
-                expression { return params.RUN_ANSIBLE_DEPLOY }
-            }
             steps {
                 script {
                     def gitSha = env.GIT_COMMIT ?: sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     def resolvedImageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : gitSha.take(12)
 
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        withEnv([
-                            "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
-                            "IMAGE_TAG=${resolvedImageTag}",
-                            "DOCKER_REGISTRY_URL=${params.DOCKER_REGISTRY_URL.trim()}",
-                            "K8S_NAMESPACE=${env.K8S_NAMESPACE}",
-                            "MINIKUBE_PROFILE=${env.MINIKUBE_PROFILE}"
-                        ]) {
-                            sh 'sh scripts/ci/deploy-ansible-minikube-k8s.sh'
-                        }
+                    withEnv([
+                        "IMAGE_REPOSITORY_PREFIX=${params.IMAGE_REPOSITORY_PREFIX.trim()}",
+                        "IMAGE_TAG=${resolvedImageTag}",
+                        "DOCKER_REGISTRY_URL=${params.DOCKER_REGISTRY_URL.trim()}",
+                        "K8S_NAMESPACE=${env.K8S_NAMESPACE}",
+                        "MINIKUBE_PROFILE=${env.MINIKUBE_PROFILE}"
+                    ]) {
+                        sh 'sh scripts/ci/deploy-ansible-minikube-k8s.sh'
                     }
-                }
-            }
-        }
-
-        stage('ELK observability verification') {
-            when {
-                expression { return params.RUN_ELK_VERIFICATION }
-            }
-            steps {
-                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                    sh 'sh scripts/ci/check-elk-observability.sh'
                 }
             }
         }
