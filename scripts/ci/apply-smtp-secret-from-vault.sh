@@ -33,11 +33,11 @@ kubectl set env deployment/notification-service \
   -n "$NS"
 
 kubectl rollout restart deployment/notification-service -n "$NS"
-kubectl rollout status deployment/notification-service -n "$NS" --timeout=180s || {
-  echo "notification-service rollout did not finish in time; showing debug info"
+kubectl rollout status deployment/notification-service -n "$NS" --timeout=420s || {
+  echo "notification-service rollout did not finish in time"
   kubectl get pods -n "$NS" -l app=notification-service
   kubectl describe deployment notification-service -n "$NS" || true
-  kubectl logs deployment/notification-service -n "$NS" --tail=100 || true
+  kubectl logs -n "$NS" -l app=notification-service --tail=120 || true
   exit 1
 }
 
