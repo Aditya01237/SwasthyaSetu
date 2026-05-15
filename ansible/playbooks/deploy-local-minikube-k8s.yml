@@ -11,6 +11,9 @@
     image_repository_prefix: "{{ lookup('env', 'IMAGE_REPOSITORY_PREFIX') }}"
     image_tag: "{{ lookup('env', 'IMAGE_TAG') }}"
     docker_registry_url: "{{ lookup('env', 'DOCKER_REGISTRY_URL') | default('docker.io', true) }}"
+    vault_addr: "{{ lookup('env', 'VAULT_ADDR') | default('http://host.docker.internal:18200', true) }}"
+    vault_token: "{{ lookup('env', 'VAULT_TOKEN') | default('', true) }}"
+    smtp_vault_path: "{{ lookup('env', 'SMTP_VAULT_PATH') | default('secret/swasthya-setu/smtp', true) }}"
 
   tasks:
     - name: Check Docker is available
@@ -49,6 +52,17 @@
         DOCKER_REGISTRY_URL: "{{ docker_registry_url }}"
         K8S_NAMESPACE: "{{ k8s_namespace }}"
         K8S_RUN_HEALTH_CHECK: "false"
+
+    - name: Apply SMTP secrets from Vault to Kubernetes
+      shell: sh scripts/ci/apply-smtp-secret-from-vault.sh
+      args:
+        chdir: "{{ project_root }}"
+      environment:
+        VAULT_ADDR: "{{ vault_addr }}"
+        VAULT_TOKEN: "{{ vault_token }}"
+        SMTP_VAULT_PATH: "{{ smtp_vault_path }}"
+        K8S_NAMESPACE: "{{ k8s_namespace }}"
+      when: vault_token | length > 0
 
     - name: Show final pod status
       command: kubectl get pods -n {{ k8s_namespace }}

@@ -32,4 +32,7 @@ kubectl set env deployment/notification-service \
   --from=secret/smtp-secret \
   -n "$NS"
 
+kubectl rollout restart deployment/notification-service -n "$NS"
+kubectl rollout status deployment/notification-service -n "$NS"
+
 echo "SMTP secret applied to notification-service"
