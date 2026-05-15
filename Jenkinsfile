@@ -198,6 +198,20 @@ pipeline {
             }
         }
 
+        stage('Apply SMTP Secrets From Vault') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'swasthya-vault-token', variable: 'VAULT_TOKEN')
+                ]) {
+                    sh '''
+                        export VAULT_ADDR=http://host.docker.internal:18200
+                        export K8S_NAMESPACE=swasthya-setu
+                        sh scripts/ci/apply-smtp-secret-from-vault.sh
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker Images') {
             steps {
                 sh 'docker compose build'
