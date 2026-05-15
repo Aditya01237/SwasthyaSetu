@@ -1,0 +1,59 @@
+---
+- name: Deploy SwasthyaSetu to local Minikube Kubernetes using Ansible
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    project_root: "{{ playbook_dir }}/../.."
+    minikube_profile: "{{ lookup('env', 'MINIKUBE_PROFILE') | default('minikube', true) }}"
+    k8s_namespace: "{{ lookup('env', 'K8S_NAMESPACE') | default('swasthya-setu', true) }}"
+    image_repository_prefix: "{{ lookup('env', 'IMAGE_REPOSITORY_PREFIX') }}"
+    image_tag: "{{ lookup('env', 'IMAGE_TAG') }}"
+    docker_registry_url: "{{ lookup('env', 'DOCKER_REGISTRY_URL') | default('docker.io', true) }}"
+
+  tasks:
+    - name: Check Docker is available
+      command: docker info
+      changed_when: false
+
+    - name: Check Minikube status
+      command: minikube -p {{ minikube_profile }} status
+      register: minikube_status
+      changed_when: false
+      failed_when: false
+
+    - name: Start Minikube if not running
+      command: minikube start -p {{ minikube_profile }}
+      when: minikube_status.rc != 0
+
+    - name: Enable ingress addon
+      command: minikube -p {{ minikube_profile }} addons enable ingress
+      changed_when: false
+
+    - name: Enable metrics-server addon for HPA
+      command: minikube -p {{ minikube_profile }} addons enable metrics-server
+      changed_when: false
+
+    - name: Verify Kubernetes cluster access
+      command: kubectl get nodes
+      changed_when: false
+
+    - name: Deploy Kubernetes manifests using Docker Hub registry images
+      shell: sh scripts/ci/deploy-k8s-registry.sh
+      args:
+        chdir: "{{ project_root }}"
+      environment:
+        IMAGE_REPOSITORY_PREFIX: "{{ image_repository_prefix }}"
+        IMAGE_TAG: "{{ image_tag }}"
+        DOCKER_REGISTRY_URL: "{{ docker_registry_url }}"
+        K8S_NAMESPACE: "{{ k8s_namespace }}"
+        K8S_RUN_HEALTH_CHECK: "false"
+
+    - name: Show final pod status
+      command: kubectl get pods -n {{ k8s_namespace }}
+      changed_when: false
+
+    - name: Show final deployment status
+      command: kubectl get deployments -n {{ k8s_namespace }}
+      changed_when: false
