@@ -27,7 +27,7 @@
       failed_when: false
 
     - name: Start Minikube if not running
-      command: minikube start -p {{ minikube_profile }} --driver=docker --cpus=6 --memory=10000
+      command: minikube start -p {{ minikube_profile }} --driver=docker --cpus=6 --memory=9000
       when: minikube_status.rc != 0
 
     - name: Enable ingress addon
