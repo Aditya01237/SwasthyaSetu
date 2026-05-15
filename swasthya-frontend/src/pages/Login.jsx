@@ -33,7 +33,8 @@ const Login = () => {
   const handleSendOtp = async () => {
     try {
       setLoading(true);
-      const res = await api.post("/auth/send-otp", { uhid });
+      const trimmedUhid = uhid.trim();
+      const res = await api.post("/auth/send-otp", { uhid: trimmedUhid });
       const payload = res.data?.data ?? res.data;
       setMaskedEmail(payload?.maskedEmail || "");
       setStep(2);
@@ -53,8 +54,19 @@ const Login = () => {
   const handleVerifyOtp = async () => {
     try {
       setLoading(true);
-      const res = await api.post("/auth/verify-otp", { uhid, otp });
-      const { token, patient } = res.data.data;
+      const trimmedUhid = uhid.trim();
+      const digitsOnly = otp.replace(/\D/g, "");
+      const res = await api.post("/auth/verify-otp", {
+        uhid: trimmedUhid,
+        otp: digitsOnly,
+      });
+      const payload = res.data?.data ?? res.data;
+      const token = payload?.token;
+      const patient = payload?.patient;
+      if (!token || !patient) {
+        alert("Login response was incomplete. Check the gateway and auth service.");
+        return;
+      }
       localStorage.setItem("patientToken", token);
       localStorage.setItem("uhid", patient.uhid);
       localStorage.setItem("user", JSON.stringify(patient));
@@ -186,7 +198,7 @@ const Login = () => {
 
                       <button
                         onClick={handleSendOtp}
-                        disabled={!uhid || loading}
+                        disabled={!uhid.trim() || loading}
                         className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white py-3 rounded-xl font-medium text-sm
                                    hover:opacity-90 hover:-translate-y-px active:translate-y-0 transition-all
                                    disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0
@@ -272,7 +284,7 @@ const Login = () => {
                           value={otp}
                           maxLength={6}
                           onChange={(e) =>
-                            setOtp(e.target.value.replace(/\D/, ""))
+                            setOtp(e.target.value.replace(/\D/g, ""))
                           }
                           className={`${inputClass} text-center text-xl tracking-[0.5em] font-bold`}
                         />
