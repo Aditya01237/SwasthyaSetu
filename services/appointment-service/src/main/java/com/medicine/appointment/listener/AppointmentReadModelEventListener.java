@@ -99,14 +99,30 @@ public class AppointmentReadModelEventListener {
             try {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
 
-                Doctor doctor = findManagedDoctor(event);
+                if (event.id() == null) {
+                    throw new IllegalArgumentException("doctor.registered event id is null");
+                }
 
-                applyDoctor(doctor, event);
+                Doctor doctor = doctorRepository.findById(event.id())
+                        .orElseGet(Doctor::new);
 
-                saveDoctorSafely(doctor, event);
+                doctor.setId(event.id());
+                doctor.setName(event.name());
+                doctor.setSpecialization(event.specialization());
+                doctor.setExperience(event.experience());
+                doctor.setFee(event.fee());
+                doctor.setEmail(event.email());
+                doctor.setPassword(event.password());
 
-                log.info("Synced doctor {} (email={}) into appointment read model",
-                        event.name(), event.email());
+                if (event.hospitalId() != null && !event.hospitalId().isBlank()) {
+                    hospitalRepository.findById(event.hospitalId())
+                            .ifPresent(doctor::setHospital);
+                }
+
+                doctorRepository.save(doctor);
+
+                log.info("Synced doctor {} with id={} into appointment read model",
+                        event.name(), event.id());
 
             } catch (Exception ex) {
                 log.error("Failed to sync doctor.registered into appointment read model", ex);
