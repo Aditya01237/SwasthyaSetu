@@ -21,8 +21,7 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtFilter jwtFilter,
-            @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174}") String allowedOrigins
-    ) {
+            @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174}") String allowedOrigins) {
         this.jwtFilter = jwtFilter;
         this.allowedOrigins = List.of(allowedOrigins.split(","))
                 .stream()
@@ -51,10 +50,11 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> {})
+                .cors(cors -> {
+                })
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/hospital/**", "/api/doctor/hospital/**").permitAll()
                         // Patients can view doctor profiles (read-only)
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/doctor/*").authenticated()
@@ -65,8 +65,7 @@ public class SecurityConfig {
                         // Doctor management endpoints require DOCTOR role
                         .requestMatchers("/api/doctor/**").hasRole("DOCTOR")
                         .requestMatchers("/api/patient/**").hasRole("PATIENT")
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
 
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 

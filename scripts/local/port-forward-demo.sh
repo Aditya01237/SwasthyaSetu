@@ -5,7 +5,9 @@ NS="${K8S_NAMESPACE:-swasthya-setu}"
 cleanup() {
   echo ""
   echo "Stopping SwasthyaSetu local port-forwards..."
-  jobs -p | xargs -r kill 2>/dev/null || true
+  for pid in $(jobs -p); do
+    kill "$pid" 2>/dev/null || true
+  done
 }
 
 start_port_forward() {
