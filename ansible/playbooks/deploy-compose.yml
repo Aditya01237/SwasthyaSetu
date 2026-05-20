@@ -1,0 +1,21 @@
+---
+# Main deploy playbook — uses modular roles for SwasthyaSetu deployment
+- name: Setup Docker on target host
+  hosts: swasthya_servers
+  gather_facts: true
+  become: true
+  vars:
+    compose_file_args: >-
+      -f docker-compose.yml -f docker-compose.images.yml{% if run_service_db_sync | default(false) | bool %} -f docker-compose.service-dbs.yml{% endif %}
+    compose_environment:
+      IMAGE_REPOSITORY_PREFIX: "{{ image_repository_prefix }}"
+      IMAGE_TAG: "{{ image_tag }}"
+      COMPOSE_PROJECT_NAME: "{{ compose_project_name | default('swasthya-setu') }}"
+    deploy_path: "{{ remote_deploy_path | default('swasthya-setu') }}"
+    docker_registry_url: "{{ lookup('env', 'DOCKER_REGISTRY_URL') | default('docker.io') }}"
+  roles:
+    - role: common
+      when: setup_system | default(true) | bool
+    - role: docker
+      when: setup_docker | default(true) | bool
+    - role: app

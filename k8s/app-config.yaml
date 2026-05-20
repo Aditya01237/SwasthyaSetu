@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swasthya-config
+data:
+  POSTGRES_DB: swasthyasetudb
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+  BACKEND_DATASOURCE_URL: jdbc:postgresql://postgres:5432/swasthyasetudb
+  AUTH_SERVICE_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "3"
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "1"
+  SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
+  PATIENT_SERVICE_DATASOURCE_URL: jdbc:postgresql://postgres:5432/patient_db
+  APPOINTMENT_SERVICE_DATASOURCE_URL: jdbc:postgresql://postgres:5432/appointment_db
+  HOSPITAL_SERVICE_DATASOURCE_URL: jdbc:postgresql://postgres:5432/hospital_db
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_RABBITMQ_HOST: rabbitmq
+  SPRING_RABBITMQ_PORT: "5672"
+  APP_EVENTS_EXCHANGE: swasthya.events
+  APP_EVENTS_APPOINTMENT_BOOKED_ROUTING_KEY: appointment.booked
+  APP_EVENTS_PATIENT_REGISTERED_ROUTING_KEY: patient.registered
+  APP_EVENTS_OTP_REQUESTED_ROUTING_KEY: auth.otp-requested
+  APP_EVENTS_DOCTOR_REGISTERED_ROUTING_KEY: doctor.registered
+  APP_EVENTS_HOSPITAL_UPSERTED_ROUTING_KEY: hospital.upserted
+  APP_EVENTS_APPOINTMENT_BOOKED_QUEUE: notification.appointment-booked
+  APP_EVENTS_PATIENT_REGISTERED_QUEUE: notification.patient-registered
+  APP_EVENTS_OTP_REQUESTED_QUEUE: notification.otp-requested
+  APP_EVENTS_AUTH_PATIENT_REGISTERED_QUEUE: auth.patient-registered
+  APP_EVENTS_AUTH_HOSPITAL_UPSERTED_QUEUE: auth.hospital-upserted
+  APP_EVENTS_AUTH_DOCTOR_REGISTERED_QUEUE: auth.doctor-registered
+  APP_EVENTS_APPOINTMENT_PATIENT_REGISTERED_QUEUE: appointment.patient-registered
+  APP_EVENTS_APPOINTMENT_HOSPITAL_UPSERTED_QUEUE: appointment.hospital-upserted
+  APP_EVENTS_APPOINTMENT_DOCTOR_REGISTERED_QUEUE: appointment.doctor-registered
+  APP_EVENTS_PATIENT_APPOINTMENT_BOOKED_QUEUE: patient.appointment-booked
+  APP_EVENTS_PATIENT_HOSPITAL_UPSERTED_QUEUE: patient.hospital-upserted
+  APP_EVENTS_PATIENT_DOCTOR_REGISTERED_QUEUE: patient.doctor-registered
+  APP_EVENTS_HOSPITAL_DOCTOR_REGISTERED_QUEUE: hospital.doctor-registered
+  # Real SMTP (Gmail) for OTP/notifications in Minikube. Set spring-mail-* in app-secrets.yaml.
+  # For Mailpit-only testing, set host mailpit, port 1025, auth/starttls false here instead.
+  SPRING_MAIL_HOST: smtp.gmail.com
+  SPRING_MAIL_PORT: "587"
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+  MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+  MANAGEMENT_HEALTH_RABBIT_ENABLED: "false"
+  MANAGEMENT_HEALTH_REDIS_ENABLED: "false"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED: "true"
+  AI_SERVICE_URL: http://ai-service:8000
+  BACKEND_URL: http://backend:8090
+  AUTH_SERVICE_URL: http://auth-service:8081
+  HOSPITAL_SERVICE_URL: http://hospital-service:8084
+  APPOINTMENT_SERVICE_URL: http://appointment-service:8083
+  PATIENT_SERVICE_URL: http://patient-service:8082
+  APP_CORS_ALLOWED_ORIGINS: http://swasthya.local,http://localhost:5173,http://localhost:5174
+  APPOINTMENT_SLOT_LOCK_TTL_SECONDS: "60"
+  # Cap JVM heap to prevent OOMKilled during rolling updates
+  JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+data:
+  10-create-service-dbs.sh: |
+    #!/bin/sh
+    set -e
+
+    create_database() {
+        local database=$1
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+            SELECT 'CREATE DATABASE $database'
+            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$database')\gexec
+    EOSQL
+    }
+
+    create_database swasthyasetudb
+    create_database auth_db
+    create_database patient_db
+    create_database appointment_db
+    create_database hospital_db

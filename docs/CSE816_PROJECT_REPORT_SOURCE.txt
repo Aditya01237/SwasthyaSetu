@@ -1,0 +1,254 @@
+================================================================================
+SWASTHYA SETU – DEVOPS / CSE 816 PROJECT SUMMARY (FOR REPORT DRAFT)
+================================================================================
+Generated as plain text for copy-paste into your assignment report.
+Adjust wording, marks, and screenshots to match your rubric and what you
+personally demonstrated.
+
+--------------------------------------------------------------------------------
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+
+Name: SwasthyaSetu (healthcare-oriented microservices platform).
+
+Goal (DevOps angle): Automate the software lifecycle using Git, Jenkins CI/CD,
+Docker, optional Ansible and remote deploy, Kubernetes (including Minikube),
+and optional ELK observability—aligned with IIITB CSE 816 “Software Production
+Engineering” style expectations.
+
+Repository layout (high level):
+- services/          Java Spring Boot microservices (api-gateway, auth, patient,
+                     appointment, hospital, notification, backend) + ai-service (Python)
+- swasthya-frontend/ Patient SPA (Node → static + nginx in Docker)
+- doctor-frontend/   Doctor SPA (Node → static + nginx in Docker)
+- docker-compose*.yml  Local / CI full stack, overlays (images, service DBs, observability, Vault)
+- k8s/               Kustomize manifests for Kubernetes (deployments, services, ingress, HPA, config)
+- scripts/ci/        Shell scripts for validate, test, publish, deploy, health, ELK, K8s
+- ansible/           Playbooks and roles for configuration management + remote Docker deploy
+- Jenkinsfile        Declarative multistage pipeline at repository root
+
+
+--------------------------------------------------------------------------------
+2. TECHNOLOGIES AND TOOLS USED
+--------------------------------------------------------------------------------
+
+Version control & collaboration
+- Git, GitHub (source hosting, webhooks for Jenkins)
+
+CI/CD
+- Jenkins (Declarative Pipeline, Pipeline from SCM)
+- Jenkins plugins (typical set): Pipeline, Git, GitHub (for githubPush + /github-webhook/),
+  Credentials Binding, SSH Agent, JUnit
+- GitHub “hook trigger for GITScm polling” on the Jenkins job + webhook URL
+  ending in /github-webhook/
+
+Build & test toolchain (on Jenkins agent or developer machine)
+- JDK 21, Apache Maven (batch mode -B used in pipeline for Java tests)
+- Node.js 22+ (npm ci, npm run build for both frontends)
+- Python 3 (py_compile check for ai-service)
+
+Containerization
+- Docker Engine, Docker BuildKit (DOCKER_BUILDKIT=1), Docker Compose v2
+- Per-service Dockerfiles (multi-stage Maven builds for Java services)
+- docker-compose.yml as the main stack definition; additional compose files for
+  published images, per-service databases, observability (ELK), Vault demo
+
+Registry & image delivery
+- Docker Hub (or compatible registry) via docker login + publish-images.sh
+- docker-compose.images.yml for image names/tags (IMAGE_REPOSITORY_PREFIX, IMAGE_TAG)
+
+Orchestration & scaling
+- Kubernetes, kubectl, Kustomize (kubectl apply -k k8s)
+- Minikube (local cluster), minikube addons (e.g. ingress)
+- Horizontal Pod Autoscaler (HPA) resources under k8s/ (course “scalability” angle)
+
+Configuration management
+- Ansible: ansible/playbooks/*.yml, ansible/roles/ (e.g. docker role, app role)
+- deploy-ansible.sh invoked from Jenkins when RUN_ANSIBLE_DEPLOY is used
+
+Secrets & advanced (as in repo)
+- Optional HashiCorp Vault demo: docker-compose.vault.yml, scripts/ci/setup-vault.sh
+- Kubernetes Secrets via k8s/app-secrets.yaml (placeholders in git; real secrets local/CI only)
+
+Monitoring & logging (course ELK expectation)
+- ELK-style stack via docker-compose.observability.yml and scripts such as
+  scripts/ci/check-elk-observability.sh; GELF/logging integration in architecture
+- Kibana dashboards for log exploration when ELK overlay is running
+
+Databases & messaging (application stack)
+- PostgreSQL (shared or service-owned DB overlays), Redis, RabbitMQ, Mailpit (SMTP capture)
+
+
+--------------------------------------------------------------------------------
+3. WHAT THE JENKINS PIPELINE DOES (Jenkinsfile)
+--------------------------------------------------------------------------------
+
+Triggering
+- triggers { githubPush() } in the Jenkinsfile so pushes integrate with the
+  GitHub plugin when the job webhook is configured.
+- Job must also enable “GitHub hook trigger for GITScm polling” and GitHub
+  webhook payload URL as documented in docs/github-webhook-jenkins.md and
+  docs/jenkins-ci-cd.md.
+
+Global options (representative)
+- disableConcurrentBuilds(), buildDiscarder, pipeline timeout (value may change
+  by branch—check current Jenkinsfile).
+
+Environment block (representative)
+- COMPOSE_PROJECT_NAME=swasthya-setu-ci so Jenkins Compose runs do not clash with
+  a developer’s default docker compose project on the same host.
+- Host port variables for Postgres, Redis, RabbitMQ, Mailpit, gateway, services,
+  frontends—mapped to high ports (e.g. 15433, 16379, 18080) to reduce collisions
+  when a second stack runs alongside a local default stack.
+
+Typical stage order (conceptual)
+1) Checkout          – checkout scm
+2) Validate Config   – scripts/ci/validate-config.sh (docker compose config on
+                       multiple compose combinations; kubectl kustomize k8s if kubectl exists)
+3) Test Java Services – scripts/ci/test-java-services.sh (sequential Maven tests)
+4) Build Frontends   – sequential npm ci + npm run build for both apps (retry on npm)
+5) Check AI Service  – python3 -m py_compile on ai-service app
+6) Build Docker Images – optional docker compose build when RUN_DOCKER_BUILD and not PUBLISH_IMAGES
+7) Publish Docker Images – when PUBLISH_IMAGES; docker login + publish-images.sh
+8) Deploy Local Compose – when RUN_LOCAL_DEPLOY; deploy-compose.sh + health-check.sh
+9) Deploy Minikube / K8s registry / Remote / Ansible / ELK – only when the corresponding
+                       boolean parameter is true (stages skipped otherwise)
+
+Post actions
+- JUnit: services/*/target/surefire-reports/*.xml (allowEmptyResults)
+- archiveArtifacts: jars and frontend dist folders
+
+Parameters still gate optional deploy stages—verify Jenkinsfile on your branch.
+
+
+--------------------------------------------------------------------------------
+4. WHAT WAS ADDED OR ADJUSTED (WORKFLOW / RELIABILITY)
+--------------------------------------------------------------------------------
+
+Docker Compose – patient-service stability
+- Stronger healthcheck for patient-service: start_period, more retries, longer
+  timeout; SPRING_JPA_SHOW_SQL=false and explicit MANAGEMENT_HEALTH_RABBIT_ENABLED=false
+  in compose to speed startup under full-stack load.
+
+Docker Compose – Mailpit host ports
+- Default published Mailpit ports moved from 1025/8025 to 11025/18025 to avoid
+  “port already allocated” on common SMTP port 1025.
+
+Docker Compose – parallel stacks (Jenkins vs local dev)
+- New file: .env.ci – defines high host ports matching Jenkins environment so
+  project name swasthya-setu-ci does not fight with an already running
+  swasthya-setu default stack (Redis 6379, Rabbit 5672, gateway 8080, etc.).
+- scripts/ci/deploy-compose.sh sources .env.ci when COMPOSE_PROJECT_NAME is
+  swasthya-setu-ci so Jenkins local deploy and matching local runs get consistent ports.
+- .env.example updated with a short pointer to .env.ci for parallel-stack usage.
+
+Kubernetes / Minikube – how to run locally
+- scripts/ci/deploy-minikube.sh: start Minikube (optional), enable ingress addon,
+  optionally build images inside Minikube’s Docker (eval minikube docker-env),
+  kubectl apply -k k8s, then scripts/ci/health-check-k8s.sh.
+- health-check-k8s.sh uses temporary kubectl port-forward during checks; after the
+  script exits, forwards stop—so for manual browser testing you either run
+  minikube tunnel (ingress) or keep separate port-forward terminals open.
+
+Documentation touched during DevOps work (examples)
+- docs/jenkins-ci-cd.md – agent requirements, job setup, CSE 816 notes, parameters
+- docs/github-webhook-jenkins.md – webhook URL, plugin list, job steps
+
+
+--------------------------------------------------------------------------------
+5. HOW EACH “DEVOPS LAYER” WORKS (FOR REPORT NARRATIVE)
+--------------------------------------------------------------------------------
+
+Git → Jenkins
+- Developer pushes to GitHub → webhook hits Jenkins → pipeline job runs from SCM
+  Jenkinsfile → checkout → validate → tests → optional image build/publish →
+  optional deploy targets.
+
+Docker / Compose
+- Single command brings up Postgres, Redis, RabbitMQ, Mailpit, AI, Java services,
+  gateway, frontends with healthchecks and depends_on ordering.
+- Overlays add published image builds, per-service DBs, ELK, Vault without forking
+  the whole compose file.
+
+Docker Hub
+- publish-images.sh builds with docker-compose.images.yml and pushes tagged images
+  suitable for Kubernetes pull-based deploy (render-k8s-registry / deploy-k8s-registry).
+
+Kubernetes
+- kustomization.yaml pulls in deployments, services, ingress, autoscalers, config.
+- Namespace swasthya-setu; services talk in-cluster via DNS (e.g. postgres:5432).
+
+Ansible (when used)
+- SSH to targets, optionally install Docker, copy compose/repo material, login to
+  registry, compose pull/up—see scripts/ci/deploy-ansible.sh and ansible playbooks.
+
+ELK (when used)
+- Compose overlay starts Elasticsearch/Logstash/Kibana; scripts verify health and
+  can smoke-test log ingestion paths used by the app.
+
+
+--------------------------------------------------------------------------------
+6. WHAT YOU SHOULD LIST AS “YOUR SETUP” IN THE REPORT
+--------------------------------------------------------------------------------
+
+Checklist you can tick after you actually perform each step:
+
+[ ] GitHub repository with SwasthyaSetu code on your branch
+[ ] Jenkins server with JDK 21, Maven, Node 22, Python 3, Docker + Compose
+[ ] Jenkins credentials: Docker Hub (ID e.g. swasthya-dockerhub)
+[ ] Jenkins Pipeline job: Pipeline from SCM, correct branch, Script Path Jenkinsfile
+[ ] Build trigger: GitHub hook for GITScm polling + GitHub webhook to /github-webhook/
+[ ] Successful pipeline run: console shows checkout, tests, publish (if enabled), deploy
+[ ] Local or lab: docker compose stack OR Minikube kubectl apply -k k8s
+[ ] Browser or curl: gateway / patient / doctor URLs (via tunnel or port-forward)
+[ ] (Optional) Ansible deploy, ELK verification, Vault demo per rubric “advanced”
+
+
+--------------------------------------------------------------------------------
+7. LIMITATIONS / HONEST NOTES FOR THE REPORT
+--------------------------------------------------------------------------------
+
+- Running two full Compose stacks on one machine requires different published host
+  ports (.env.ci + COMPOSE_PROJECT_NAME=swasthya-setu-ci pattern).
+- Minikube image builds inside Minikube Docker can be slow or flaky on network to
+  Docker Hub; building on host + minikube image load is a known workaround in
+  constrained environments.
+- Kubernetes Secrets in git should remain placeholders; real Gmail/registry secrets
+  belong in Jenkins credentials or sealed secrets—not committed.
+- Pipeline timeout and which stages are optional (when { }) depend on the exact
+  Jenkinsfile revision you submit—quote from your branch.
+
+
+--------------------------------------------------------------------------------
+8. FILE INDEX (QUICK REFERENCE FOR APPENDIX)
+--------------------------------------------------------------------------------
+
+Jenkinsfile
+docs/jenkins-ci-cd.md
+docs/github-webhook-jenkins.md
+docs/cse816-rubric-mapping.md (if present)
+.env.example
+.env.ci
+docker-compose.yml
+docker-compose.images.yml
+docker-compose.service-dbs.yml
+docker-compose.observability.yml
+docker-compose.vault.yml
+scripts/ci/validate-config.sh
+scripts/ci/publish-images.sh
+scripts/ci/deploy-compose.sh
+scripts/ci/deploy-minikube.sh
+scripts/ci/deploy-k8s-registry.sh
+scripts/ci/deploy-remote-compose.sh
+scripts/ci/deploy-ansible.sh
+scripts/ci/health-check.sh
+scripts/ci/health-check-k8s.sh
+scripts/ci/check-elk-observability.sh
+k8s/kustomization.yaml
+k8s/ingress.yaml
+ansible/playbooks/*.yml
+
+
+================================================================================
+END OF SOURCE TEXT – EDIT AND FORMAT FOR YOUR FINAL PDF/REPORT AS NEEDED.
+================================================================================

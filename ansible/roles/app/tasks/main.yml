@@ -1,0 +1,64 @@
+---
+# Role: app — deploy SwasthyaSetu application using Docker Compose
+- name: Create deployment directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ deploy_path }}"
+    - "{{ deploy_path }}/docker/postgres"
+    - "{{ deploy_path }}/scripts/ci"
+
+- name: Copy Compose files to remote host
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../{{ item }}"
+    dest: "{{ deploy_path }}/{{ item }}"
+    mode: "0644"
+  loop:
+    - docker-compose.yml
+    - docker-compose.images.yml
+    - docker-compose.service-dbs.yml
+    - docker/postgres/init-multiple-databases.sh
+    - docker/postgres/sync-service-databases.sh
+    - scripts/ci/health-check.sh
+
+- name: Copy .env file if provided
+  ansible.builtin.copy:
+    src: "{{ lookup('env', 'REMOTE_ENV_FILE') }}"
+    dest: "{{ deploy_path }}/.env"
+    mode: "0600"
+  when: lookup('env', 'REMOTE_ENV_FILE') | length > 0
+
+- name: Log in to Docker registry
+  community.docker.docker_login:
+    registry_url: "{{ docker_registry_url | default('docker.io') }}"
+    username: "{{ lookup('env', 'REGISTRY_USERNAME') }}"
+    password: "{{ lookup('env', 'REGISTRY_PASSWORD') }}"
+  no_log: true
+  when: lookup('env', 'REGISTRY_USERNAME') | length > 0
+
+- name: Pull latest images
+  ansible.builtin.command:
+    cmd: >
+      docker compose {{ compose_file_args }}
+      pull
+    chdir: "{{ deploy_path }}"
+  environment: "{{ compose_environment }}"
+
+- name: Start SwasthyaSetu stack
+  ansible.builtin.command:
+    cmd: >
+      docker compose {{ compose_file_args }}
+      up -d --remove-orphans
+    chdir: "{{ deploy_path }}"
+  environment: "{{ compose_environment }}"
+
+- name: Wait for application health
+  ansible.builtin.command:
+    cmd: sh scripts/ci/health-check.sh
+    chdir: "{{ deploy_path }}"
+  retries: 5
+  delay: 15
+  register: health_result
+  until: health_result.rc == 0

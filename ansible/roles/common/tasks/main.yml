@@ -1,0 +1,24 @@
+---
+# Role: common — baseline system setup for all SwasthyaSetu hosts
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+- name: Install required system packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+      - gnupg
+      - python3-pip
+    state: present
+  become: true
+
+- name: Ensure /etc/swasthya-setu config directory exists
+  ansible.builtin.file:
+    path: /etc/swasthya-setu
+    state: directory
+    mode: "0755"
+  become: true

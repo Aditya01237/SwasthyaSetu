@@ -1,0 +1,73 @@
+name: swasthya-setu
+
+x-elk-logging: &elk-logging
+  driver: gelf
+  options:
+    gelf-address: "udp://localhost:${LOGSTASH_GELF_PORT:-12201}"
+    tag: "{{.Name}}"
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.15.3}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-8.15.3}
+    environment:
+      LS_JAVA_OPTS: ${LOGSTASH_JAVA_OPTS:--Xms256m -Xmx256m}
+    ports:
+      - "${LOGSTASH_GELF_PORT:-12201}:12201/udp"
+      - "${LOGSTASH_API_PORT:-9600}:9600"
+    volumes:
+      - ./docker/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.15.3}
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    depends_on:
+      - elasticsearch
+
+  backend:
+    logging: *elk-logging
+
+  auth-service:
+    logging: *elk-logging
+
+  hospital-service:
+    logging: *elk-logging
+
+  appointment-service:
+    logging: *elk-logging
+
+  patient-service:
+    logging: *elk-logging
+
+  notification-service:
+    logging: *elk-logging
+
+  api-gateway:
+    logging: *elk-logging
+
+  ai-service:
+    logging: *elk-logging
+
+  swasthya-frontend:
+    logging: *elk-logging
+
+  doctor-frontend:
+    logging: *elk-logging
+
+volumes:
+  elasticsearch-data:
