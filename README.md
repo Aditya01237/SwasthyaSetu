@@ -1,785 +1,343 @@
 # SwasthyaSetu
 
-**SwasthyaSetu** means **Health Bridge**. It is a healthcare appointment and patient-management platform built using a microservices architecture and a complete DevOps workflow.
+SwasthyaSetu ("Health Bridge") is a healthcare appointment and patient-record
+platform built around Spring Boot microservices. It provides separate patient
+and doctor experiences, OTP-based authentication, appointment booking,
+QR-controlled record access, asynchronous notifications, and a complete local
+DevOps path from Docker Compose to Kubernetes.
 
-The project demonstrates how a real-world healthcare system can be built, containerized, tested, deployed to Kubernetes, secured using Vault, and monitored using ELK/Kibana.
+## Product highlights
 
----
-
-## Table of Contents
-
-1. [Project Overview](#project-overview)
-2. [Problem Statement](#problem-statement)
-3. [Key Features](#key-features)
-4. [Architecture](#architecture)
-5. [Microservices](#microservices)
-6. [Technology Stack](#technology-stack)
-7. [Database Design](#database-design)
-8. [DevOps Workflow](#devops-workflow)
-9. [Repository Structure](#repository-structure)
-10. [Prerequisites](#prerequisites)
-11. [Local Kubernetes Deployment](#local-kubernetes-deployment)
-12. [Vault SMTP Setup](#vault-smtp-setup)
-13. [Demo Database Seeding](#demo-database-seeding)
-14. [Application Access](#application-access)
-15. [Jenkins Pipeline](#jenkins-pipeline)
-16. [Observability](#observability)
-17. [Useful Commands](#useful-commands)
-18. [Troubleshooting](#troubleshooting)
-19. [Viva Explanation](#viva-explanation)
-
----
-
-## Project Overview
-
-SwasthyaSetu is a hospital appointment booking and healthcare access platform. It connects patients, doctors, hospital administration, and backend services through a unified system.
-
-The project focuses on both software functionality and DevOps practices:
-
-- Microservices-based backend
-- Patient and doctor frontend applications
-- PostgreSQL, Redis, and RabbitMQ infrastructure
-- Docker-based containerization
-- Jenkins CI/CD pipeline
-- Kubernetes deployment on Minikube
-- Ansible-based deployment automation
-- HashiCorp Vault for secrets
-- ELK stack for log monitoring
-
----
-
-## Problem Statement
-
-Healthcare systems are often fragmented. Patients may need to call hospitals, manually track appointments, carry physical records, and wait in inefficient queues.
-
-SwasthyaSetu solves this by providing a single platform where:
-
-- Patients can register and authenticate using OTP.
-- Patients can browse doctors and hospitals.
-- Appointments can be booked digitally.
-- Services communicate through APIs and asynchronous messaging.
-- Secrets are managed securely.
-- Logs and deployment status can be monitored.
-
----
-
-## Key Features
-
-### Patient Side
-
-- Patient registration
-- OTP-based login
-- Browse hospitals and doctors
-- Appointment booking
-- View appointment-related information
-
-### Doctor / Hospital Side
-
-- Doctor frontend
-- Hospital and doctor data management
-- Doctor appointment visibility
-
-### DevOps Features
-
-- CI/CD pipeline using Jenkins
-- Docker image build and push to Docker Hub
-- Kubernetes deployment using Ansible
-- Vault-based SMTP secret injection
-- RabbitMQ-based asynchronous notification flow
-- Redis support for fast appointment-related operations
-- ELK stack for centralized logging
-- Minikube local cluster deployment
-
----
+- Patient registration and time-limited OTP authentication.
+- Hospital and doctor discovery with appointment scheduling.
+- Redis-backed slot locks that prevent concurrent double booking.
+- QR-based appointment verification before medical-record access or
+  prescription upload.
+- Audit records for QR scans and patient-record access.
+- RabbitMQ events for OTP, registration, appointment, hospital, and doctor
+  workflows.
+- Patient and doctor React applications behind a Spring Cloud API Gateway.
+- Docker Compose development stack with PostgreSQL, Redis, RabbitMQ, Mailpit,
+  and a Python AI service.
+- Jenkins, Docker, Ansible, Minikube, Kubernetes HPA, HashiCorp Vault, and ELK
+  deployment support.
 
 ## Architecture
 
-High-level request flow:
+```mermaid
+flowchart LR
+    PatientUI[Patient React UI] --> Gateway[Spring API Gateway]
+    DoctorUI[Doctor React UI] --> Gateway
 
-```text
-Patient / Doctor Frontend
-        |
-        v
-API Gateway
-        |
-        +--> auth-service
-        +--> patient-service
-        +--> hospital-service
-        +--> appointment-service
-        +--> backend
-        +--> ai-service
-        |
-        v
-RabbitMQ / Redis / PostgreSQL
-        |
-        v
-notification-service -> Gmail SMTP OTP
+    Gateway --> Auth[Auth service]
+    Gateway --> Patient[Patient service]
+    Gateway --> Hospital[Hospital service]
+    Gateway --> Appointment[Appointment service]
+    Gateway --> Backend[Legacy backend]
+
+    Auth --> PostgreSQL[(PostgreSQL)]
+    Patient --> PostgreSQL
+    Hospital --> PostgreSQL
+    Appointment --> PostgreSQL
+    Backend --> PostgreSQL
+
+    Appointment --> Redis[(Redis slot locks)]
+    Patient --> AI[Python AI service]
+
+    Auth --> RabbitMQ[(RabbitMQ)]
+    Patient --> RabbitMQ
+    Hospital --> RabbitMQ
+    Appointment --> RabbitMQ
+    RabbitMQ --> Notification[Notification service]
+    Notification --> Mail[Mailpit or SMTP]
 ```
 
-DevOps flow:
+Both React applications send requests through the API Gateway. Domain services
+own authentication, patients, hospitals, appointments, and notifications.
+PostgreSQL stores operational data, Redis serializes competing appointment
+requests, and RabbitMQ distributes domain events without coupling producers to
+email delivery or downstream read models. The patient service also calls the
+Python AI service for prescription processing.
 
-```text
-Developer Pushes Code to GitHub
-        |
-        v
-Jenkins Pipeline
-        |
-        +--> Validate Config
-        +--> Run Tests
-        +--> Build Frontends
-        +--> Check AI Service
-        +--> Start / Seed Vault
-        +--> Build Docker Images
-        +--> Push Images to Docker Hub
-        +--> Deploy to Minikube using Ansible
-        +--> Apply SMTP Secrets from Vault
-        |
-        v
-Kubernetes Cluster
+## Delivery architecture
+
+```mermaid
+flowchart LR
+    GitHub[GitHub repository] --> Jenkins[Jenkins pipeline]
+    Jenkins --> Validate[Config validation and tests]
+    Validate --> Images[Docker image builds]
+    Vault[HashiCorp Vault] --> Jenkins
+    Images --> Registry[Container registry]
+    Registry --> Ansible[Ansible deployment]
+    Ansible --> Minikube[Minikube Kubernetes]
+    Minikube --> HPA[HPA and metrics-server]
+    Minikube --> ELK[Elasticsearch, Logstash, Kibana]
 ```
 
----
+The pipeline validates configuration, tests Java services, builds both
+frontends, checks the AI service, builds and publishes images, deploys the stack
+to Minikube through Ansible, and injects SMTP configuration from Vault.
 
-## Microservices
+## Services
 
-| Service | Purpose |
-|---|---|
-| `api-gateway` | Entry point for frontend requests and route forwarding |
-| `auth-service` | OTP login and authentication-related operations |
-| `patient-service` | Patient registration and patient data |
-| `hospital-service` | Hospital and doctor-related data |
-| `appointment-service` | Appointment booking and appointment flow |
-| `notification-service` | Consumes events and sends OTP/email notifications |
-| `backend` | Legacy/backend transition service |
-| `ai-service` | Python AI service used by the platform |
-| `swasthya-frontend` | Patient frontend |
-| `doctor-frontend` | Doctor frontend |
+| Component | Default port | Responsibility |
+| --- | ---: | --- |
+| `api-gateway` | `8080` | Public routing and JWT-aware API entry point |
+| `auth-service` | `8081` | Patient/doctor OTP and authentication flow |
+| `patient-service` | `8082` | Patient profiles, history, QR audit, prescriptions |
+| `appointment-service` | `8083` | Booking, slots, QR validation, Redis locking |
+| `hospital-service` | `8084` | Hospital and doctor information |
+| `notification-service` | `8086` | RabbitMQ consumers and email notifications |
+| `backend` | `8090` | Legacy/transition backend capabilities |
+| `ai-service` | `8000` | Python prescription-processing service |
+| `swasthya-frontend` | `5173` | Patient web application |
+| `doctor-frontend` | `5174` | Doctor web application |
 
----
+## Technology
 
-## Technology Stack
+| Layer | Stack |
+| --- | --- |
+| Frontend | React 19, JavaScript, Vite 8, Tailwind CSS, React Router, Axios |
+| Services | Java 21, Spring Boot 4, Spring Web, Spring Data JPA |
+| Gateway and security | Spring API Gateway, JWT, CORS configuration |
+| Data and messaging | PostgreSQL 16, Redis 7, RabbitMQ 3 |
+| AI | Python service |
+| Local email | Mailpit; external SMTP can be configured |
+| Delivery | Jenkins, Docker, Docker Compose, Ansible |
+| Orchestration | Kubernetes, Minikube, Kustomize, HPA |
+| Secrets and observability | HashiCorp Vault, Elasticsearch, Logstash, Kibana |
 
-### Backend
+## Quick start with Docker Compose
 
-- Java Spring Boot
-- Spring Web
-- Spring Data JPA
-- Spring Security / JWT
-- Spring AMQP
-- PostgreSQL
-- Redis
-- RabbitMQ
-
-### Frontend
-
-- React
-- Vite
-- Axios
-- Tailwind / CSS styling
-
-### AI Service
-
-- Python
-- FastAPI-style lightweight service structure
-
-### DevOps
-
-- GitHub
-- Jenkins
-- Docker
-- Docker Compose
-- Docker Hub
-- Kubernetes
-- Minikube
-- Ansible
-- HashiCorp Vault
-- ELK Stack: Elasticsearch, Logstash, Kibana
-
----
-
-## Database Design
-
-The project uses **one PostgreSQL pod/container**, but inside it there are **multiple logical databases**.
-
-```text
-One PostgreSQL instance
-        |
-        +--> swasthyasetudb
-        +--> auth_db
-        +--> patient_db
-        +--> appointment_db
-        +--> hospital_db
-```
-
-Service-to-database mapping:
-
-| Service | Database |
-|---|---|
-| `backend` | `swasthyasetudb` |
-| `auth-service` | `auth_db` |
-| `patient-service` | `patient_db` |
-| `appointment-service` | `appointment_db` |
-| `hospital-service` | `hospital_db` |
-
-This means we are not running a separate PostgreSQL container for every service. Instead, we run one PostgreSQL StatefulSet and create multiple service-specific databases inside it.
-
----
-
-## DevOps Workflow
-
-SwasthyaSetu implements the following DevOps lifecycle:
-
-1. Developer pushes code to GitHub.
-2. Jenkins pipeline is triggered.
-3. Jenkins validates configuration.
-4. Jenkins runs Java service tests.
-5. Jenkins builds frontend applications.
-6. Jenkins checks the Python AI service.
-7. Vault is started and seeded with registry/app secrets.
-8. Docker images are built.
-9. Docker images are pushed to Docker Hub.
-10. Ansible deploys Kubernetes manifests to Minikube.
-11. SMTP secrets are read from Vault and applied as Kubernetes Secret.
-12. Kubernetes restarts `notification-service` so it receives SMTP credentials.
-
----
-
-## Repository Structure
-
-```text
-SwasthyaSetu/
-|
-|-- Jenkinsfile
-|-- docker-compose.yml
-|-- docker-compose.vault.yml
-|-- docker-compose.observability.yml
-|-- dummy_data.sql
-|
-|-- services/
-|   |-- api-gateway/
-|   |-- auth-service/
-|   |-- patient-service/
-|   |-- hospital-service/
-|   |-- appointment-service/
-|   |-- notification-service/
-|   |-- backend/
-|   |-- ai-service/
-|
-|-- swasthya-frontend/
-|-- doctor-frontend/
-|
-|-- k8s/
-|   |-- namespace.yaml
-|   |-- app-config.yaml
-|   |-- app-secrets.yaml
-|   |-- postgres.yaml
-|   |-- redis.yaml
-|   |-- rabbitmq.yaml
-|   |-- app-services.yaml
-|   |-- frontends.yaml
-|   |-- ingress.yaml
-|   |-- hpa.yaml
-|   |-- kustomization.yaml
-|
-|-- ansible/
-|   |-- playbooks/
-|       |-- deploy-local-minikube-k8s.yml
-|
-|-- scripts/
-|   |-- ci/
-|   |-- local/
-|
-|-- docker/
-|   |-- postgres/
-|   |-- logstash/
-|
-|-- docs/
-```
-
----
-
-## Prerequisites
-
-Install the following tools:
+### Prerequisites
 
 - Git
-- Docker Desktop
-- Docker Compose
-- Java 17+
-- Maven
-- Node.js and npm
-- Python 3
-- Jenkins
-- kubectl
-- Minikube
-- Ansible
-- Vault CLI
+- Docker Desktop with Docker Compose
+- `curl` for the health-check script
 
-For Mac M-series systems, Docker Desktop resources should be increased before starting Minikube.
-
-Recommended Docker Desktop resources:
-
-```text
-CPU: 6 or more
-Memory: 10 GB or more
-Swap: 2 GB or more
-Disk: 60 GB or more
-```
-
----
-
-## Local Kubernetes Deployment
-
-Clone the repository:
+Clone and start the complete local stack:
 
 ```bash
-git clone https://github.com/Aditya01237/SwasthyaSetu.git
+git clone git@github.com:Aditya01237/SwasthyaSetu.git
 cd SwasthyaSetu
-git checkout aditya-branch
+cp .env.example .env
+docker compose up -d --build
 ```
 
-Start Minikube manually if needed:
+Wait for every application to become ready:
 
 ```bash
-minikube delete
+sh scripts/ci/health-check.sh
+```
+
+### Local URLs
+
+| Application | URL |
+| --- | --- |
+| Patient application | `http://localhost:5173/patient/` |
+| Doctor application | `http://localhost:5174/doctor/` |
+| API Gateway health | `http://localhost:8080/actuator/health` |
+| Mailpit inbox | `http://localhost:18025` |
+| RabbitMQ management | `http://localhost:15672` |
+
+Mailpit captures OTP and appointment emails locally, so Gmail credentials are
+not required for the default Compose workflow.
+
+Stop the stack without deleting persistent volumes:
+
+```bash
+docker compose down
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and override only the values needed for your
+environment. Important groups include:
+
+- PostgreSQL credentials and service JDBC URLs.
+- Redis and RabbitMQ ports and credentials.
+- public ports for the gateway, services, and frontends.
+- `JWT_SECRET` and allowed frontend origins.
+- `NOTIFICATION_MAIL_*` values when replacing Mailpit with external SMTP.
+- container registry, tag, ELK, and local CI stack settings.
+
+The default Compose profile uses one PostgreSQL instance and the
+`swasthyasetudb` database. `docker-compose.service-dbs.yml` can be layered in to
+test service-specific logical databases such as `auth_db`, `patient_db`,
+`appointment_db`, and `hospital_db`.
+
+Do not commit `.env`, Vault tokens, SMTP passwords, or registry credentials.
+
+## Verification
+
+Validate Compose/Kubernetes configuration:
+
+```bash
+sh scripts/ci/validate-config.sh
+```
+
+Run the Java service checks:
+
+```bash
+sh scripts/ci/test-java-services.sh
+```
+
+Build both React applications:
+
+```bash
+sh scripts/ci/build-frontends.sh
+```
+
+Check a running Compose stack:
+
+```bash
+sh scripts/ci/health-check.sh
+```
+
+## Core flows
+
+### OTP authentication
+
+1. A patient or doctor requests an OTP through the gateway.
+2. `auth-service` stores an expiring verification record.
+3. An `auth.otp-requested` event is published to RabbitMQ.
+4. `notification-service` consumes the event and sends the message through
+   Mailpit or the configured SMTP provider.
+5. Successful verification allows the authenticated workflow to continue.
+
+### Appointment booking
+
+1. The patient selects a hospital, doctor, date, and time slot.
+2. `appointment-service` obtains a short-lived Redis lock for that slot.
+3. The appointment is persisted only when the slot remains available.
+4. An appointment event updates downstream read models and notifications.
+5. The patient receives booking details and a QR token.
+
+### QR-controlled medical access
+
+1. The doctor scans the appointment QR code.
+2. `appointment-service` validates the appointment and doctor relationship.
+3. `patient-service` records a `QR_SCAN` audit event.
+4. Prescription upload and related medical-record operations are unlocked for
+   the validated appointment.
+
+## Kubernetes and Ansible
+
+Recommended local Minikube resources are at least 6 CPUs and 9 GB of memory.
+
+```bash
 minikube start --driver=docker --cpus=6 --memory=9000
 minikube addons enable ingress
 minikube addons enable metrics-server
+sh scripts/ci/deploy-ansible-minikube-k8s.sh
 ```
 
-Check cluster:
+Verify the deployment:
 
 ```bash
-kubectl get nodes
+sh scripts/ci/health-check-k8s.sh
+kubectl get pods -n swasthya-setu
+kubectl top pods -n swasthya-setu
 ```
 
-The Jenkins/Ansible deployment can also start Minikube automatically if it is not running.
+The manifests under `k8s/` define application deployments, infrastructure,
+ingress, autoscaling, observability, and the `swasthya-setu` namespace. Ansible
+provides repeatable local Minikube and remote Compose deployment playbooks.
 
----
+## Vault and external SMTP
 
-## Vault SMTP Setup
-
-Vault is used for SMTP credentials so Gmail credentials are not hardcoded into Kubernetes YAML files.
-
-Start Vault:
+The default local stack uses Mailpit. For a Kubernetes demo with real SMTP,
+start the Vault overlay and store credentials outside the repository:
 
 ```bash
-export VAULT_PORT=18200
-export VAULT_DEV_ROOT_TOKEN=swasthya-root-token
-
 docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d vault
-```
-
-Set Vault environment:
-
-```bash
 export VAULT_ADDR=http://localhost:18200
-export VAULT_TOKEN=swasthya-root-token
-```
-
-Check Vault:
-
-```bash
-vault status
-```
-
-Add SMTP credentials:
-
-```bash
+export VAULT_TOKEN=your-local-vault-token
 vault kv put secret/swasthya-setu/smtp \
-  SPRING_MAIL_USERNAME="your_email@gmail.com" \
-  SPRING_MAIL_PASSWORD="your_gmail_app_password" \
-  SPRING_MAIL_HOST="smtp.gmail.com" \
-  SPRING_MAIL_PORT="587" \
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH="true" \
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE="true" \
-  APP_NOTIFICATION_FROM="your_email@gmail.com"
+  SPRING_MAIL_USERNAME="your-email@example.com" \
+  SPRING_MAIL_PASSWORD="your-app-password" \
+  SPRING_MAIL_HOST="smtp.example.com" \
+  SPRING_MAIL_PORT="587"
 ```
 
-Verify safely:
-
-```bash
-vault kv get -field=SPRING_MAIL_USERNAME secret/swasthya-setu/smtp
-vault kv get -field=SPRING_MAIL_HOST secret/swasthya-setu/smtp
-vault kv get -field=SPRING_MAIL_PASSWORD secret/swasthya-setu/smtp | wc -c
-```
-
-Important:
-
-```text
-Vault is running in dev/in-memory mode for local demo.
-If the Vault container restarts, manually inserted SMTP secrets may be lost.
-Add the SMTP secret again before running Jenkins if Vault was recreated.
-```
-
----
-
-## Demo Database Seeding
-
-After deleting and recreating Minikube, PostgreSQL starts fresh. The old patient data will be gone.
-
-Use the database seed script after Jenkins deployment:
-
-```bash
-./scripts/local/seed-demo-database.sh
-```
-
-This script:
-
-1. Waits for `postgres-0`.
-2. Scales down DB-dependent services.
-3. Restarts Postgres to clear old connections.
-4. Loads `dummy_data.sql` into `swasthyasetudb`.
-5. Runs `sync-service-databases.sh`.
-6. Copies demo data into service databases.
-7. Starts services again.
-
-Demo UHID:
-
-```text
-UHID-987654321
-```
-
-Test OTP:
-
-```bash
-curl -i --max-time 30 -X POST http://localhost:8081/api/auth/send-otp \
-  -H "Content-Type: application/json" \
-  -d '{"uhid":"UHID-987654321"}'
-```
-
----
-
-## Application Access
-
-After deployment, run:
-
-```bash
-./scripts/local/port-forward-demo.sh
-```
-
-Then open:
-
-| Application | URL |
-|---|---|
-| Patient Frontend | `http://localhost:3004/patient/` |
-| Doctor Frontend | `http://localhost:3003/doctor/` |
-| API Gateway | `http://localhost:8081` |
-
-Health check:
-
-```bash
-curl -i http://localhost:8081/actuator/health
-```
-
----
-
-## Jenkins Pipeline
-
-Jenkins pipeline file:
-
-```text
-Jenkinsfile
-```
-
-Main stages:
-
-1. Checkout
-2. Validate Config
-3. Test Java Services
-4. Build Frontends
-5. Check AI Service
-6. HashiCorp Vault
-7. Build Docker Images
-8. Publish Docker Images
-9. Deploy Local Minikube With Ansible
-10. Apply SMTP Secrets From Vault
-
-Recommended Jenkins build parameters:
-
-| Parameter | Example |
-|---|---|
-| `IMAGE_REPOSITORY_PREFIX` | `docker.io/adityapareek01` |
-| `IMAGE_TAG` | Leave empty to use Git SHA |
-| `DOCKER_REGISTRY_URL` | `docker.io` |
-| `DOCKER_REGISTRY_CREDENTIALS_ID` | `swasthya-dockerhub` |
-
-Required Jenkins credentials:
-
-| Credential ID | Type | Purpose |
-|---|---|---|
-| `swasthya-dockerhub` | Username with password | Docker Hub login |
-| `swasthya-vault-token` | Secret text | Vault root token for local demo |
-
----
+The Jenkins stage `Apply SMTP Secrets From Vault` reads these values and updates
+the Kubernetes Secret consumed by `notification-service`. The included Vault
+profile is intended for local demonstrations, not production operation.
 
 ## Observability
 
-The project supports ELK-based logging using:
+Start the ELK overlay with the application stack:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.observability.yml \
+  up -d
+```
+
+| Tool | Default URL/port | Purpose |
+| --- | --- | --- |
+| Elasticsearch | `http://localhost:9200` | Stores indexed logs |
+| Kibana | `http://localhost:5601` | Searches and visualizes logs |
+| Logstash | GELF `12201`, API `9600` | Receives and transforms service logs |
+
+For Kubernetes resource metrics, use `kubectl top pods -n swasthya-setu` after
+enabling `metrics-server`.
+
+## Jenkins pipeline
+
+The root `Jenkinsfile` contains these primary stages:
+
+1. Checkout and configuration validation.
+2. Parallel Java service tests.
+3. Patient and doctor frontend builds.
+4. Python AI-service validation.
+5. Vault preparation.
+6. Docker image build and registry publication.
+7. Ansible-driven Minikube deployment.
+8. SMTP Secret injection from Vault.
+
+Jenkins requires appropriately scoped registry and Vault credentials. Use the
+credential IDs documented in the pipeline parameters instead of placing secrets
+in source-controlled files.
+
+## Repository layout
 
 ```text
-docker-compose.observability.yml
+services/
+  api-gateway/          Public API routing
+  auth-service/         OTP and authentication
+  patient-service/      Patients, records, QR audit
+  appointment-service/  Booking, slots, Redis locks, QR validation
+  hospital-service/     Hospitals and doctors
+  notification-service/ RabbitMQ-driven email delivery
+  backend/              Legacy transition service
+  ai-service/           Python AI API
+swasthya-frontend/      Patient React application
+doctor-frontend/        Doctor React application
+docker/                 PostgreSQL and Logstash support files
+k8s/                    Kubernetes and Kustomize manifests
+ansible/                Deployment inventories and playbooks
+scripts/ci/             Validation, build, deploy, and health scripts
+scripts/local/          Demo seeding and port-forward helpers
+docs/                   Reports, architecture notes, and runbooks
+Jenkinsfile             CI/CD pipeline
+docker-compose.yml      Complete local application stack
 ```
 
-Start ELK overlay:
+## Demo data
+
+After a fresh Kubernetes deployment, seed the demonstration databases with:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+sh scripts/local/seed-demo-database.sh
 ```
 
-ELK components:
-
-| Tool | Purpose |
-|---|---|
-| Elasticsearch | Stores logs |
-| Logstash | Processes logs |
-| Kibana | Visualizes logs |
-
-Kubernetes metrics-server is enabled for:
+For local access to Kubernetes services, run:
 
 ```bash
-kubectl top pods
-kubectl top node
+sh scripts/local/port-forward-demo.sh
 ```
 
----
-
-## Useful Commands
-
-Check pods:
-
-```bash
-kubectl get pods -n swasthya-setu
-```
-
-Check deployments:
-
-```bash
-kubectl get deployments -n swasthya-setu
-```
-
-Check services:
-
-```bash
-kubectl get svc -n swasthya-setu
-```
-
-Check pod resource usage:
-
-```bash
-kubectl top pods -n swasthya-setu
-kubectl top node
-```
-
-Restart a deployment:
-
-```bash
-kubectl rollout restart deployment/notification-service -n swasthya-setu
-```
-
-Wait for rollout:
-
-```bash
-kubectl rollout status deployment/notification-service -n swasthya-setu --timeout=900s
-```
-
-View logs:
-
-```bash
-kubectl logs -n swasthya-setu deployment/notification-service --tail=150
-```
-
-Check SMTP env safely:
-
-```bash
-kubectl exec -n swasthya-setu deployment/notification-service -- sh -c '
-echo "USERNAME=$SPRING_MAIL_USERNAME"
-echo "HOST=$SPRING_MAIL_HOST"
-echo "PORT=$SPRING_MAIL_PORT"
-echo "FROM=$APP_NOTIFICATION_FROM"
-if [ -n "$SPRING_MAIL_PASSWORD" ]; then echo "PASSWORD_EXISTS"; else echo "PASSWORD_MISSING"; fi
-'
-```
-
----
-
-## Troubleshooting
-
-### 1. Vault says no value found
-
-Error:
-
-```text
-No value found at secret/data/swasthya-setu/smtp
-```
-
-Reason:
-
-```text
-Vault dev mode uses in-memory storage. Secret was lost after Vault restart.
-```
-
-Fix:
-
-```bash
-vault kv put secret/swasthya-setu/smtp \
-  SPRING_MAIL_USERNAME="your_email@gmail.com" \
-  SPRING_MAIL_PASSWORD="your_gmail_app_password" \
-  SPRING_MAIL_HOST="smtp.gmail.com" \
-  SPRING_MAIL_PORT="587" \
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH="true" \
-  SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE="true" \
-  APP_NOTIFICATION_FROM="your_email@gmail.com"
-```
-
-### 2. OTP says Patient not found
-
-Reason:
-
-```text
-After deleting Minikube, PostgreSQL data is fresh.
-The UHID may not exist in auth_db.
-```
-
-Fix:
-
-```bash
-./scripts/local/seed-demo-database.sh
-```
-
-Then use:
-
-```text
-UHID-987654321
-```
-
-### 3. Postgres says too many clients already
-
-Reason:
-
-```text
-Multiple Spring Boot services opened many DB connections.
-```
-
-Fix:
-
-```bash
-kubectl scale deployment backend auth-service patient-service appointment-service hospital-service -n swasthya-setu --replicas=0
-kubectl delete pod postgres-0 -n swasthya-setu
-```
-
-Then run database seed script.
-
-### 4. Notification service rollout timeout
-
-Reason:
-
-```text
-Local Minikube is resource-limited. Spring Boot startup can be slow.
-```
-
-Fix:
-
-```bash
-kubectl rollout status deployment/notification-service -n swasthya-setu --timeout=900s
-```
-
-### 5. Docker Desktop memory error
-
-Error:
-
-```text
-Docker Desktop has only 9937MB memory but you specified 10000MB
-```
-
-Fix:
-
-Use:
-
-```bash
-minikube start --driver=docker --cpus=6 --memory=9000
-```
-
-or increase Docker Desktop memory from settings.
-
----
-
-## Viva Explanation
-
-Short explanation:
-
-```text
-SwasthyaSetu is a healthcare appointment booking platform built using microservices. It has separate services for authentication, patients, hospitals, appointments, notifications, API gateway, backend, AI service, and frontends. Each service is containerized using Docker and deployed to Kubernetes using Jenkins and Ansible.
-```
-
-DevOps explanation:
-
-```text
-When code is pushed to GitHub, Jenkins validates the configuration, runs tests, builds frontend and backend images, pushes them to Docker Hub, and deploys them to a local Minikube Kubernetes cluster using Ansible. Vault is used to store SMTP secrets, which are injected into Kubernetes as a Secret and used by notification-service to send OTP emails.
-```
-
-Database explanation:
-
-```text
-We run one PostgreSQL StatefulSet in Kubernetes. Inside that single PostgreSQL instance, we create multiple logical databases such as auth_db, patient_db, appointment_db, hospital_db, and swasthyasetudb. Each service connects to its own database using JDBC URLs from the Kubernetes ConfigMap.
-```
-
-RabbitMQ explanation:
-
-```text
-RabbitMQ is used for asynchronous communication. For example, auth-service can publish OTP events, and notification-service consumes those events and sends emails. This decouples authentication from notification delivery.
-```
-
-Vault explanation:
-
-```text
-Vault stores sensitive SMTP credentials. Jenkins reads SMTP values from Vault, creates a Kubernetes Secret called smtp-secret, injects it into notification-service, and restarts the deployment so the service can send OTP emails.
-```
-
-Kubernetes explanation:
-
-```text
-Kubernetes manages all services as deployments and runs infrastructure components like PostgreSQL, Redis, and RabbitMQ. Services communicate internally using Kubernetes service names, and frontend/API access is done using port forwarding or ingress.
-```
-
----
-
-## Final Demo Checklist
-
-Before demo:
-
-```bash
-export VAULT_ADDR=http://localhost:18200
-export VAULT_TOKEN=swasthya-root-token
-vault kv get secret/swasthya-setu/smtp
-```
-
-Run Jenkins pipeline.
-
-After Jenkins success:
-
-```bash
-./scripts/local/seed-demo-database.sh
-./scripts/local/port-forward-demo.sh
-```
-
-Test OTP:
-
-```bash
-curl -i --max-time 30 -X POST http://localhost:8081/api/auth/send-otp \
-  -H "Content-Type: application/json" \
-  -d '{"uhid":"UHID-987654321"}'
-```
-
----
-
-## Contributors
-
-- Aditya Pareek
-- Project team members
-
----
-
-## License
-
-This repository is created for academic and demonstration purposes as part of the Software Production Engineering / DevOps project.
+Detailed deployment notes, rubric mapping, and troubleshooting material remain
+available under `docs/`, `k8s/README.md`, and `ansible/README.md`.
