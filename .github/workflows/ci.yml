@@ -134,3 +134,30 @@ jobs:
           done
           auth_count=$(psql -h localhost -U postgres -d auth_db -tAc "SELECT count(*) FROM information_schema.columns WHERE table_name='doctors' AND column_name='password';")
           test "${auth_count}" = "1"
+
+  kubernetes-render:
+    name: Render Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Render base manifests
+        run: kubectl kustomize k8s > /tmp/swasthya-base.yaml
+
+      - name: Render production manifests
+        run: kubectl kustomize k8s/overlays/production > /tmp/swasthya-production.yaml
+
+      - name: Verify legacy backend is absent
+        run: |
+          if grep -Eq '^[[:space:]]*name:[[:space:]]*backend[[:space:]]*$' /tmp/swasthya-base.yaml; then
+            echo "Legacy backend resource is still present in base manifests"
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*name:[[:space:]]*backend[[:space:]]*$' /tmp/swasthya-production.yaml; then
+            echo "Legacy backend resource is still present in production manifests"
+            exit 1
+          fi
