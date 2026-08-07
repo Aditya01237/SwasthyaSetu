@@ -16,9 +16,6 @@ services:
   ai-service:
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
-  backend:
-    ports:
-      - "${BACKEND_PORT:-8090}:8090"
   auth-service:
     ports:
       - "${AUTH_SERVICE_PORT:-8081}:8081"
