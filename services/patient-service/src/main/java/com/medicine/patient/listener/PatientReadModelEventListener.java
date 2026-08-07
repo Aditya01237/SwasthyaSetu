@@ -1,6 +1,7 @@
 package com.medicine.patient.listener;
 
 import com.medicine.patient.client.AppointmentReadModelClient;
+import com.medicine.patient.dto.DoctorReadModelSnapshot;
 import com.medicine.patient.entity.Appointment;
 import com.medicine.patient.entity.Doctor;
 import com.medicine.patient.entity.Hospital;
@@ -8,7 +9,6 @@ import com.medicine.patient.entity.Patient;
 import com.medicine.patient.event.AppointmentBookedEvent;
 import com.medicine.patient.event.DoctorRegisteredEvent;
 import com.medicine.patient.event.HospitalUpsertedEvent;
-import com.medicine.patient.dto.DoctorReadModelSnapshot;
 import com.medicine.patient.repository.AppointmentRepository;
 import com.medicine.patient.repository.DoctorRepository;
 import com.medicine.patient.repository.HospitalRepository;
@@ -62,27 +62,26 @@ public class PatientReadModelEventListener {
         transactionTemplate.execute(status -> {
             try {
                 AppointmentBookedEvent event = objectMapper.readValue(payload, AppointmentBookedEvent.class);
+                if (event.appointmentId() == null) {
+                    throw new IllegalArgumentException("appointment.booked event is missing appointmentId");
+                }
+
                 Optional<Patient> patient = findPatient(event);
-                Optional<Hospital> hospital = event.hospitalId() == null ? Optional.empty() : hospitalRepository.findById(event.hospitalId());
+                Optional<Hospital> hospital = event.hospitalId() == null
+                        ? Optional.empty()
+                        : hospitalRepository.findById(event.hospitalId());
                 Optional<Doctor> doctor = resolveDoctorForAppointmentBooked(event);
 
                 if (patient.isEmpty() || hospital.isEmpty() || doctor.isEmpty()) {
-                    log.warn(
-                            "Skipping appointment.booked sync because read-model dependency is missing: appointment={}, patient={}, hospital={}, doctor={}",
-                            event.appointmentId(),
-                            patient.isPresent(),
-                            hospital.isPresent(),
-                            doctor.isPresent()
+                    throw new IllegalStateException(
+                            "Read-model dependency missing for appointment=" + event.appointmentId()
+                                    + " patient=" + patient.isPresent()
+                                    + " hospital=" + hospital.isPresent()
+                                    + " doctor=" + doctor.isPresent()
                     );
-                    return null;
                 }
 
                 Long appointmentId = event.appointmentId();
-                if (appointmentId == null) {
-                    log.warn("Skipping appointment.booked sync: missing appointmentId");
-                    return null;
-                }
-
                 if (appointmentRepository.existsById(appointmentId)) {
                     Appointment appointment = appointmentRepository.findById(appointmentId).orElseThrow();
                     appointment.setPatient(patient.get());
@@ -101,12 +100,14 @@ public class PatientReadModelEventListener {
                     appointment.setCreatedAt(parseDateTime(event.createdAt()));
                     entityManager.persist(appointment);
                 }
+
                 log.info("Synced appointment {} into patient read model", appointmentId);
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync appointment.booked into patient read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync appointment.booked; message will be retried", ex);
+                throw new RuntimeException("appointment.booked patient read-model sync failed", ex);
             }
-            return null;
         });
     }
 
@@ -114,31 +115,34 @@ public class PatientReadModelEventListener {
         if (event.doctorId() == null) {
             return Optional.empty();
         }
+
         Optional<Doctor> existing = doctorRepository.findById(event.doctorId());
         if (existing.isPresent()) {
             return existing;
         }
-        Optional<DoctorReadModelSnapshot> snap = appointmentReadModelClient.fetchDoctorSnapshot(event.doctorId());
-        if (snap.isEmpty()) {
+
+        Optional<DoctorReadModelSnapshot> snapshot = appointmentReadModelClient.fetchDoctorSnapshot(event.doctorId());
+        if (snapshot.isEmpty()) {
             return Optional.empty();
         }
-        DoctorReadModelSnapshot s = snap.get();
+
+        DoctorReadModelSnapshot s = snapshot.get();
         try {
-            Doctor d = new Doctor();
-            d.setId(s.id());
-            d.setEmail(s.email());
-            d.setName(s.name());
-            d.setSpecialization(s.specialization());
-            d.setExperience(s.experience());
-            d.setFee(s.fee());
+            Doctor doctor = new Doctor();
+            doctor.setId(s.id());
+            doctor.setEmail(s.email());
+            doctor.setName(s.name());
+            doctor.setSpecialization(s.specialization());
+            doctor.setExperience(s.experience());
+            doctor.setFee(s.fee());
             if (s.hospitalId() != null) {
-                hospitalRepository.findById(s.hospitalId()).ifPresent(d::setHospital);
+                hospitalRepository.findById(s.hospitalId()).ifPresent(doctor::setHospital);
             }
-            entityManager.persist(d);
+            entityManager.persist(doctor);
             entityManager.flush();
             return doctorRepository.findById(event.doctorId());
         } catch (Exception ex) {
-            log.warn("Failed to hydrate doctor {} from appointment-service: {}", event.doctorId(), ex.getMessage());
+            log.warn("Failed to hydrate doctor {} from appointment-service", event.doctorId(), ex);
             return Optional.empty();
         }
     }
@@ -152,11 +156,12 @@ public class PatientReadModelEventListener {
                 applyHospital(hospital, event);
                 hospitalRepository.save(hospital);
                 log.info("Synced hospital {} into patient read model", event.id());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync hospital.upserted into patient read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync hospital.upserted; message will be retried", ex);
+                throw new RuntimeException("hospital.upserted patient read-model sync failed", ex);
             }
-            return null;
         });
     }
 
@@ -167,8 +172,7 @@ public class PatientReadModelEventListener {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
                 Long doctorId = event.id();
                 if (doctorId == null) {
-                    log.warn("Skipping doctor.registered sync: missing id for email={}", event.email());
-                    return null;
+                    throw new IllegalArgumentException("doctor.registered event is missing id");
                 }
 
                 if (doctorRepository.existsById(doctorId)) {
@@ -181,12 +185,14 @@ public class PatientReadModelEventListener {
                     applyDoctorFromEvent(doctor, event);
                     entityManager.persist(doctor);
                 }
+
                 log.info("Synced doctor {} (email={}) into patient read model", event.name(), event.email());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync doctor.registered into patient read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync doctor.registered; message will be retried", ex);
+                throw new RuntimeException("doctor.registered patient read-model sync failed", ex);
             }
-            return null;
         });
     }
 
