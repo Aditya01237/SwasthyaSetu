@@ -43,11 +43,6 @@ data:
         static_configs:
           - targets: ["notification-service:8086"]
 
-      - job_name: "backend"
-        metrics_path: "/actuator/prometheus"
-        static_configs:
-          - targets: ["backend:8090"]
-
 ---
 apiVersion: apps/v1
 kind: Deployment
