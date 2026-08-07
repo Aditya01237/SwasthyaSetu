@@ -17,6 +17,7 @@ import com.medicine.auth.repository.OtpVerificationRepository;
 import com.medicine.auth.repository.PatientRepository;
 import com.medicine.auth.security.JwtUtil;
 import jakarta.transaction.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -31,19 +32,22 @@ public class AuthService {
     private final OtpVerificationRepository otpRepository;
     private final AuthEventPublisher authEventPublisher;
     private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
 
     public AuthService(PatientRepository patientRepository,
                        DoctorRepository doctorRepository,
                        HospitalRepository hospitalRepository,
                        OtpVerificationRepository otpRepository,
                        AuthEventPublisher authEventPublisher,
-                       JwtUtil jwtUtil) {
+                       JwtUtil jwtUtil,
+                       PasswordEncoder passwordEncoder) {
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.hospitalRepository = hospitalRepository;
         this.otpRepository = otpRepository;
         this.authEventPublisher = authEventPublisher;
         this.jwtUtil = jwtUtil;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -92,17 +96,33 @@ public class AuthService {
         return response;
     }
 
+    @Transactional
     public DoctorLoginResponse login(DoctorLoginRequest request) {
         Doctor doctor = doctorRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Doctor not found"));
 
-        if (!doctor.getPassword().equals(request.getPassword())) {
+        String storedPassword = doctor.getPassword();
+        boolean validPassword = isBcryptHash(storedPassword)
+                ? passwordEncoder.matches(request.getPassword(), storedPassword)
+                : storedPassword.equals(request.getPassword());
+
+        if (!validPassword) {
             throw new RuntimeException("Invalid password");
+        }
+
+        // Upgrade old plaintext rows after the first successful login.
+        if (!isBcryptHash(storedPassword)) {
+            doctor.setPassword(passwordEncoder.encode(request.getPassword()));
+            doctorRepository.save(doctor);
         }
 
         DoctorLoginResponse response = new DoctorLoginResponse();
         response.setToken(jwtUtil.generateToken(String.valueOf(doctor.getId()), "DOCTOR"));
-        response.setDoctor(doctor);
+        response.setDoctorId(doctor.getId());
+        response.setName(doctor.getName());
+        response.setEmail(doctor.getEmail());
+        response.setSpecialization(doctor.getSpecialization());
+        response.setHospitalId(doctor.getHospital() != null ? doctor.getHospital().getId() : null);
         return response;
     }
 
@@ -158,7 +178,7 @@ public class AuthService {
         doctor.setExperience(request.getExperience());
         doctor.setFee(request.getFee());
         doctor.setEmail(request.getEmail());
-        doctor.setPassword(request.getPassword());
+        doctor.setPassword(passwordEncoder.encode(request.getPassword()));
         doctor.setHospital(hospital);
         Doctor saved = doctorRepository.save(doctor);
         authEventPublisher.publishDoctorRegistered(saved);
@@ -174,6 +194,10 @@ public class AuthService {
         if (!otp.getOtp().equals(otpInput)) {
             throw new RuntimeException("Invalid OTP");
         }
+    }
+
+    private boolean isBcryptHash(String value) {
+        return value != null && (value.startsWith("$2a$") || value.startsWith("$2b$") || value.startsWith("$2y$"));
     }
 
     private String generateOtp() {
