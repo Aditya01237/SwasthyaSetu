@@ -20,25 +20,39 @@ public class RabbitReadModelConfig {
 
     @Bean
     public Queue patientAppointmentBookedQueue(@Value("${app.events.queues.patient-appointment-booked}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue patientAppointmentBookedDlq(@Value("${app.events.queues.patient-appointment-booked}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Queue patientHospitalUpsertedQueue(@Value("${app.events.queues.patient-hospital-upserted}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue patientHospitalUpsertedDlq(@Value("${app.events.queues.patient-hospital-upserted}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Queue patientDoctorRegisteredQueue(@Value("${app.events.queues.patient-doctor-registered}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue patientDoctorRegisteredDlq(@Value("${app.events.queues.patient-doctor-registered}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Binding patientAppointmentBookedBinding(
             @Qualifier("patientAppointmentBookedQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.appointment-booked}") String routingKey
-    ) {
+            @Value("${app.events.routing-keys.appointment-booked}") String routingKey) {
         return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
     }
 
@@ -46,8 +60,7 @@ public class RabbitReadModelConfig {
     public Binding patientHospitalUpsertedBinding(
             @Qualifier("patientHospitalUpsertedQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.hospital-upserted}") String routingKey
-    ) {
+            @Value("${app.events.routing-keys.hospital-upserted}") String routingKey) {
         return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
     }
 
@@ -55,8 +68,14 @@ public class RabbitReadModelConfig {
     public Binding patientDoctorRegisteredBinding(
             @Qualifier("patientDoctorRegisteredQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.doctor-registered}") String routingKey
-    ) {
+            @Value("${app.events.routing-keys.doctor-registered}") String routingKey) {
         return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
+    }
+
+    private Queue durableWithDlq(String queueName) {
+        return QueueBuilder.durable(queueName)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(queueName + ".dlq")
+                .build();
     }
 }
