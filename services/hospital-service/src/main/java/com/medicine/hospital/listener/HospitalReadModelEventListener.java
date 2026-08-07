@@ -55,11 +55,12 @@ public class HospitalReadModelEventListener {
                     doctorRepository.save(doctor);
                 }
                 log.info("Synced doctor {} (email={}) into hospital read model", event.name(), event.email());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync doctor.registered into hospital read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync doctor.registered; message will be retried", ex);
+                throw new RuntimeException("doctor.registered hospital read-model sync failed", ex);
             }
-            return null;
         });
     }
 
