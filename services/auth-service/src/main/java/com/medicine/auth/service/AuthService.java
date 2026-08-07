@@ -11,20 +11,24 @@ import com.medicine.auth.entity.Doctor;
 import com.medicine.auth.entity.Hospital;
 import com.medicine.auth.entity.OtpVerification;
 import com.medicine.auth.entity.Patient;
+import com.medicine.auth.exception.OtpValidationException;
 import com.medicine.auth.repository.DoctorRepository;
 import com.medicine.auth.repository.HospitalRepository;
 import com.medicine.auth.repository.OtpVerificationRepository;
 import com.medicine.auth.repository.PatientRepository;
 import com.medicine.auth.security.JwtUtil;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 public class AuthService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
@@ -33,6 +37,8 @@ public class AuthService {
     private final AuthEventPublisher authEventPublisher;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+    private final int maxOtpAttempts;
+    private final long resendCooldownSeconds;
 
     public AuthService(PatientRepository patientRepository,
                        DoctorRepository doctorRepository,
@@ -40,7 +46,9 @@ public class AuthService {
                        OtpVerificationRepository otpRepository,
                        AuthEventPublisher authEventPublisher,
                        JwtUtil jwtUtil,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       @Value("${app.otp.max-attempts:5}") int maxOtpAttempts,
+                       @Value("${app.otp.resend-cooldown-seconds:60}") long resendCooldownSeconds) {
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
         this.hospitalRepository = hospitalRepository;
@@ -48,6 +56,8 @@ public class AuthService {
         this.authEventPublisher = authEventPublisher;
         this.jwtUtil = jwtUtil;
         this.passwordEncoder = passwordEncoder;
+        this.maxOtpAttempts = maxOtpAttempts;
+        this.resendCooldownSeconds = resendCooldownSeconds;
     }
 
     @Transactional
@@ -61,12 +71,16 @@ public class AuthService {
 
         OtpVerification otp = otpRepository.findByUhid(request.getUhid())
                 .orElse(new OtpVerification());
+        enforceResendCooldown(otp);
+
         otp.setUhid(request.getUhid());
         otp.setPhone(patient.getPhone());
         otp.setEmail(null);
         otp.setOtp(generateOtp());
         otp.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otp.setVerified(false);
+        otp.setAttemptCount(0);
+        otp.setLastSentAt(LocalDateTime.now());
         otpRepository.save(otp);
 
         authEventPublisher.publishOtpRequested(patient.getEmail(), otp.getOtp());
@@ -77,10 +91,10 @@ public class AuthService {
         return response;
     }
 
-    @Transactional
+    @Transactional(dontRollbackOn = OtpValidationException.class)
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
         OtpVerification otp = otpRepository.findByUhid(request.getUhid())
-                .orElseThrow(() -> new RuntimeException("OTP not found"));
+                .orElseThrow(() -> new OtpValidationException("OTP not found"));
 
         validateOtp(otp, request.getOtp());
 
@@ -104,7 +118,7 @@ public class AuthService {
         String storedPassword = doctor.getPassword();
         boolean validPassword = isBcryptHash(storedPassword)
                 ? passwordEncoder.matches(request.getPassword(), storedPassword)
-                : storedPassword.equals(request.getPassword());
+                : storedPassword != null && storedPassword.equals(request.getPassword());
 
         if (!validPassword) {
             throw new RuntimeException("Invalid password");
@@ -125,26 +139,30 @@ public class AuthService {
     public SendOtpResponse sendDoctorOtp(String email) {
         OtpVerification otp = otpRepository.findByEmail(email)
                 .orElse(new OtpVerification());
+        enforceResendCooldown(otp);
+
         otp.setEmail(email);
         otp.setUhid(null);
         otp.setPhone(null);
         otp.setOtp(generateOtp());
         otp.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otp.setVerified(false);
+        otp.setAttemptCount(0);
+        otp.setLastSentAt(LocalDateTime.now());
         otpRepository.save(otp);
 
         authEventPublisher.publishOtpRequested(email, otp.getOtp());
 
         SendOtpResponse response = new SendOtpResponse();
         response.setMessage("OTP sent to doctor email");
-        response.setMaskedEmail(email);
+        response.setMaskedEmail(maskEmail(email));
         return response;
     }
 
-    @Transactional
+    @Transactional(dontRollbackOn = OtpValidationException.class)
     public boolean verifyDoctorOtp(String email, String otpInput) {
         OtpVerification otp = otpRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("OTP not found"));
+                .orElseThrow(() -> new OtpValidationException("OTP not found"));
         validateOtp(otp, otpInput);
         otp.setVerified(true);
         otpRepository.save(otp);
@@ -183,11 +201,41 @@ public class AuthService {
     }
 
     private void validateOtp(OtpVerification otp, String otpInput) {
-        if (LocalDateTime.now().isAfter(otp.getExpiryTime())) {
-            throw new RuntimeException("OTP expired");
+        LocalDateTime now = LocalDateTime.now();
+        if (otp.getExpiryTime() == null || now.isAfter(otp.getExpiryTime())) {
+            otpRepository.delete(otp);
+            throw new OtpValidationException("OTP expired. Request a new OTP.");
         }
+
+        if (otp.getAttemptCount() >= maxOtpAttempts) {
+            otpRepository.delete(otp);
+            throw new OtpValidationException("Too many OTP attempts. Request a new OTP.");
+        }
+
         if (!otp.getOtp().equals(otpInput)) {
-            throw new RuntimeException("Invalid OTP");
+            int attempts = otp.getAttemptCount() + 1;
+            otp.setAttemptCount(attempts);
+            if (attempts >= maxOtpAttempts) {
+                otpRepository.delete(otp);
+                throw new OtpValidationException("Too many OTP attempts. Request a new OTP.");
+            }
+            otpRepository.save(otp);
+            throw new OtpValidationException(
+                    "Invalid OTP. " + (maxOtpAttempts - attempts) + " attempt(s) remaining.");
+        }
+    }
+
+    private void enforceResendCooldown(OtpVerification otp) {
+        if (otp.getLastSentAt() == null) {
+            return;
+        }
+
+        LocalDateTime allowedAt = otp.getLastSentAt().plusSeconds(resendCooldownSeconds);
+        if (LocalDateTime.now().isBefore(allowedAt)) {
+            long secondsRemaining = Math.max(1,
+                    java.time.Duration.between(LocalDateTime.now(), allowedAt).getSeconds());
+            throw new OtpValidationException(
+                    "Please wait " + secondsRemaining + " second(s) before requesting another OTP.");
         }
     }
 
@@ -196,7 +244,7 @@ public class AuthService {
     }
 
     private String generateOtp() {
-        return String.valueOf(100000 + new Random().nextInt(900000));
+        return String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
     }
 
     private String maskEmail(String email) {
