@@ -149,7 +149,7 @@ jobs:
         run: kubectl kustomize k8s > /tmp/swasthya-base.yaml
 
       - name: Render production manifests
-        run: kubectl kustomize k8s/overlays/production > /tmp/swasthya-production.yaml
+        run: kubectl kustomize k8s-production > /tmp/swasthya-production.yaml
 
       - name: Verify legacy backend is absent
         run: |
