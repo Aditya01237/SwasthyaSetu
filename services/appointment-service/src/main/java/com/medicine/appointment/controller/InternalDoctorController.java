@@ -35,7 +35,6 @@ public class InternalDoctorController {
                 d.getSpecialization(),
                 d.getExperience(),
                 d.getFee(),
-                d.getPassword(),
                 hospitalId
         );
     }
