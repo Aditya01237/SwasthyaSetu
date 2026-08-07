@@ -15,6 +15,5 @@ public class DoctorReadModelResponse {
     private String specialization;
     private int experience;
     private int fee;
-    private String password;
     private String hospitalId;
 }
