@@ -22,7 +22,14 @@ public class GatewayRoutesConfig {
             @Value("${app.services.patient-url}") String patientUrl
     ) {
         return builder.routes()
-                .route("auth-service", route -> route
+                .route("admin-login-public", route -> route
+                        .path("/api/auth/admin/login")
+                        .uri(authUrl))
+                .route("admin-management-protected", route -> route
+                        .path("/api/auth/admin/**")
+                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
+                        .uri(authUrl))
+                .route("auth-service-public", route -> route
                         .path("/api/auth/**")
                         .uri(authUrl))
                 .route("hospital-service-public", route -> route
