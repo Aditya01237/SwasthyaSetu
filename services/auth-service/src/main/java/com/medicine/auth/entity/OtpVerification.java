@@ -34,4 +34,9 @@ public class OtpVerification {
     private String otp;
     private LocalDateTime expiryTime;
     private boolean verified;
+
+    @Column(nullable = false)
+    private int attemptCount;
+
+    private LocalDateTime lastSentAt;
 }
