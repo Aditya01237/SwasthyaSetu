@@ -12,14 +12,14 @@ public class HospitalAuthorization {
         }
     }
 
-    public void requireHospitalWriteAccess(String role, String authenticatedUserId, String hospitalId) {
+    public void requireHospitalWriteAccess(String role, String authenticatedHospitalId, String targetHospitalId) {
         if ("ADMIN".equalsIgnoreCase(role)) {
             return;
         }
 
         if ("HOSPITAL_ADMIN".equalsIgnoreCase(role)
-                && authenticatedUserId != null
-                && authenticatedUserId.equals(hospitalId)) {
+                && authenticatedHospitalId != null
+                && authenticatedHospitalId.equals(targetHospitalId)) {
             return;
         }
 
