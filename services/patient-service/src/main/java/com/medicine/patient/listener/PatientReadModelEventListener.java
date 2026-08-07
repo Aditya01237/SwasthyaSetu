@@ -110,9 +110,6 @@ public class PatientReadModelEventListener {
         });
     }
 
-    /**
-     * Doctor row may be missing if doctor.registered was missed or arrived late; hydrate from appointment-service.
-     */
     private Optional<Doctor> resolveDoctorForAppointmentBooked(AppointmentBookedEvent event) {
         if (event.doctorId() == null) {
             return Optional.empty();
@@ -134,7 +131,6 @@ public class PatientReadModelEventListener {
             d.setSpecialization(s.specialization());
             d.setExperience(s.experience());
             d.setFee(s.fee());
-            d.setPassword(s.password());
             if (s.hospitalId() != null) {
                 hospitalRepository.findById(s.hospitalId()).ifPresent(d::setHospital);
             }
@@ -200,7 +196,6 @@ public class PatientReadModelEventListener {
         doctor.setExperience(event.experience());
         doctor.setFee(event.fee());
         doctor.setEmail(event.email());
-        doctor.setPassword(event.password());
         if (event.hospitalId() != null) {
             hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
         }
