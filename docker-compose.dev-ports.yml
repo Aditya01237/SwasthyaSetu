@@ -1,0 +1,36 @@
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+  redis:
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+  rabbitmq:
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+  mailpit:
+    ports:
+      - "${MAILPIT_SMTP_PORT:-11025}:1025"
+      - "${MAILPIT_UI_PORT:-18025}:8025"
+  ai-service:
+    ports:
+      - "${AI_SERVICE_PORT:-8000}:8000"
+  backend:
+    ports:
+      - "${BACKEND_PORT:-8090}:8090"
+  auth-service:
+    ports:
+      - "${AUTH_SERVICE_PORT:-8081}:8081"
+  hospital-service:
+    ports:
+      - "${HOSPITAL_SERVICE_PORT:-8084}:8084"
+  appointment-service:
+    ports:
+      - "${APPOINTMENT_SERVICE_PORT:-8083}:8083"
+  patient-service:
+    ports:
+      - "${PATIENT_SERVICE_PORT:-8082}:8082"
+  notification-service:
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-8086}:8086"
