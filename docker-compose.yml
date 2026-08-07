@@ -199,6 +199,8 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       SPRING_MAIL_HOST: ${NOTIFICATION_MAIL_HOST:-${SPRING_MAIL_HOST:-mailpit}}
       SPRING_MAIL_PORT: ${NOTIFICATION_MAIL_PORT:-${SPRING_MAIL_PORT:-1025}}
       SPRING_MAIL_USERNAME: ${NOTIFICATION_MAIL_USERNAME:-${SPRING_MAIL_USERNAME:-}}
@@ -209,6 +211,8 @@ services:
       - "8086"
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       mailpit:
         condition: service_healthy
