@@ -5,6 +5,7 @@ import com.medicine.appointment.dto.QrScanRequest;
 import com.medicine.appointment.dto.QrScanResponse;
 import com.medicine.appointment.entity.Doctor;
 import com.medicine.appointment.entity.QRToken;
+import com.medicine.appointment.exception.AuthorizationException;
 import com.medicine.appointment.repository.DoctorRepository;
 import com.medicine.appointment.repository.QrTokenRepository;
 import jakarta.transaction.Transactional;
@@ -28,7 +29,7 @@ public class QrService {
     }
 
     @Transactional
-    public QrScanResponse scan(QrScanRequest request) {
+    public QrScanResponse scan(QrScanRequest request, Long authenticatedDoctorId) {
         QRToken qr = qrTokenRepository.findByToken(request.getToken())
                 .orElseThrow(() -> new RuntimeException("Invalid QR"));
 
@@ -41,8 +42,14 @@ public class QrService {
             throw new RuntimeException("QR already used");
         }
 
-        Doctor doctor = doctorRepository.findById(request.getDoctorId())
-                .orElseThrow(() -> new RuntimeException("Doctor Not Found"));
+        Doctor doctor = doctorRepository.findById(authenticatedDoctorId)
+                .orElseThrow(() -> new AuthorizationException("Authenticated doctor not found"));
+
+        if (qr.getAppointment() == null
+                || qr.getAppointment().getDoctor() == null
+                || !doctor.getId().equals(qr.getAppointment().getDoctor().getId())) {
+            throw new AuthorizationException("This QR belongs to another doctor's appointment");
+        }
 
         PatientQrAccessResponse qrAccess = patientClinicalClient.recordQrAccess(
                 qr.getAppointment().getId(),
