@@ -15,7 +15,6 @@ public class GatewayRoutesConfig {
     public RouteLocator swasthyaSetuRoutes(
             RouteLocatorBuilder builder,
             JwtValidationGatewayFilter jwtValidationGatewayFilter,
-            @Value("${app.services.backend-url}") String backendUrl,
             @Value("${app.services.auth-url}") String authUrl,
             @Value("${app.services.hospital-url}") String hospitalUrl,
             @Value("${app.services.appointment-url}") String appointmentUrl,
@@ -56,10 +55,6 @@ public class GatewayRoutesConfig {
                         .path("/api/patient/**")
                         .filters(filter -> filter.filter(jwtValidationGatewayFilter))
                         .uri(patientUrl))
-                .route("protected-monolith-transition", route -> route
-                        .path("/api/**")
-                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
-                        .uri(backendUrl))
                 .build();
     }
 }
