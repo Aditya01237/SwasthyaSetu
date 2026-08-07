@@ -20,8 +20,8 @@ import java.util.List;
 @RequestMapping("/api/doctor")
 public class DoctorController {
 
-    private static final String USER_ID_HEADER = "X-User-Id";
     private static final String USER_ROLE_HEADER = "X-User-Role";
+    private static final String HOSPITAL_ID_HEADER = "X-Hospital-Id";
 
     private final DoctorService doctorService;
     private final HospitalAuthorization authorization;
@@ -33,10 +33,10 @@ public class DoctorController {
 
     @PostMapping("/register")
     public ResponseEntity<CommonResponse<DoctorResponse>> registerDoctor(
-            @RequestHeader(USER_ID_HEADER) String authenticatedUserId,
             @RequestHeader(USER_ROLE_HEADER) String role,
+            @RequestHeader(value = HOSPITAL_ID_HEADER, required = false) String authenticatedHospitalId,
             @RequestBody DoctorRegisterRequest request) {
-        authorization.requireHospitalWriteAccess(role, authenticatedUserId, request.getHospitalId());
+        authorization.requireHospitalWriteAccess(role, authenticatedHospitalId, request.getHospitalId());
         DoctorResponse response = doctorService.registerDoctor(request);
         return ResponseEntity.ok(new CommonResponse<>("Doctor registered successfully", response, 200));
     }
