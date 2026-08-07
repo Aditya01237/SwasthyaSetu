@@ -7,6 +7,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -18,15 +19,18 @@ public class AppointmentReadModelClient {
 
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String appointmentServiceBaseUrl;
     private final String internalServiceToken;
 
     public AppointmentReadModelClient(
             @Value("${APPOINTMENT_SERVICE_URL:http://localhost:8083}") String appointmentServiceBaseUrl,
-            @Value("${app.internal.service-token}") String internalServiceToken) {
+            @Value("${app.internal.service-token}") String internalServiceToken,
+            @Value("${INTERNAL_HTTP_CONNECT_TIMEOUT_MS:3000}") int connectTimeoutMs,
+            @Value("${INTERNAL_HTTP_READ_TIMEOUT_MS:5000}") int readTimeoutMs) {
         this.appointmentServiceBaseUrl = appointmentServiceBaseUrl;
         this.internalServiceToken = internalServiceToken;
+        this.restTemplate = createRestTemplate(connectTimeoutMs, readTimeoutMs);
     }
 
     public AppointmentReadModelSnapshot fetchSnapshot(Long appointmentId) {
@@ -64,5 +68,12 @@ public class AppointmentReadModelClient {
         HttpHeaders headers = new HttpHeaders();
         headers.set(INTERNAL_TOKEN_HEADER, internalServiceToken);
         return headers;
+    }
+
+    private RestTemplate createRestTemplate(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(factory);
     }
 }
