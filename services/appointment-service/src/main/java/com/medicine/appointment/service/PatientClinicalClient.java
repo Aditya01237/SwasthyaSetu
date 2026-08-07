@@ -8,6 +8,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -19,15 +20,18 @@ public class PatientClinicalClient {
 
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String patientServiceUrl;
     private final String internalServiceToken;
 
     public PatientClinicalClient(
             @Value("${app.services.patient-url:http://localhost:8082}") String patientServiceUrl,
-            @Value("${app.internal.service-token}") String internalServiceToken) {
+            @Value("${app.internal.service-token}") String internalServiceToken,
+            @Value("${INTERNAL_HTTP_CONNECT_TIMEOUT_MS:3000}") int connectTimeoutMs,
+            @Value("${INTERNAL_HTTP_READ_TIMEOUT_MS:5000}") int readTimeoutMs) {
         this.patientServiceUrl = patientServiceUrl;
         this.internalServiceToken = internalServiceToken;
+        this.restTemplate = createRestTemplate(connectTimeoutMs, readTimeoutMs);
     }
 
     public PatientQrAccessResponse recordQrAccess(Long appointmentId, Long doctorId) {
@@ -66,5 +70,12 @@ public class PatientClinicalClient {
         HttpHeaders headers = new HttpHeaders();
         headers.set(INTERNAL_TOKEN_HEADER, internalServiceToken);
         return headers;
+    }
+
+    private RestTemplate createRestTemplate(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(factory);
     }
 }
