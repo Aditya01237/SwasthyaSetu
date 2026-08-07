@@ -1,16 +1,3 @@
-ALTER TABLE doctors
-    ADD COLUMN IF NOT EXISTS profile_id BIGINT;
-
--- Compatibility for credential rows created before hospital-profile identity was explicit.
--- Subsequent doctor.registered events reconcile this value to the hospital-owned profile ID.
-UPDATE doctors
-SET profile_id = id
-WHERE profile_id IS NULL;
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_doctors_profile_id
-    ON doctors(profile_id)
-    WHERE profile_id IS NOT NULL;
-
 CREATE TABLE IF NOT EXISTS doctor_invitations (
     doctor_id BIGINT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
