@@ -19,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class AuthReadModelEventListener {
@@ -98,25 +99,26 @@ public class AuthReadModelEventListener {
         transactionTemplate.execute(status -> {
             try {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
-                Doctor doctor = findDoctor(event);
-                if (event.id() != null) {
-                    doctor.setId(event.id());
+                Optional<Doctor> existing = findExistingDoctor(event);
+
+                // Credentials are owned by auth-service. A profile event must never create
+                // a credential row because it intentionally contains no password.
+                if (existing.isEmpty()) {
+                    log.info("Skipping doctor profile sync for unknown auth account email={}", event.email());
+                    return null;
                 }
+
+                Doctor doctor = existing.get();
                 doctor.setName(event.name());
                 doctor.setSpecialization(event.specialization());
                 doctor.setExperience(event.experience());
                 doctor.setFee(event.fee());
                 doctor.setEmail(event.email());
-                doctor.setPassword(event.password());
                 if (event.hospitalId() != null) {
                     hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
                 }
-                if (doctor.getId() != null) {
-                    entityManager.merge(doctor);
-                } else {
-                    doctorRepository.save(doctor);
-                }
-                log.info("Synced doctor {} (email={}) into auth read model", event.name(), event.email());
+                doctorRepository.save(doctor);
+                log.info("Synced doctor profile {} (email={}) into auth account", event.name(), event.email());
             } catch (Exception ex) {
                 log.error("Failed to sync doctor.registered into auth read model", ex);
                 status.setRollbackOnly();
@@ -127,16 +129,20 @@ public class AuthReadModelEventListener {
 
     private Patient findPatient(PatientRegisteredEvent event) {
         if (event.id() != null) {
-            return patientRepository.findById(event.id()).orElseGet(() -> patientRepository.findByUhid(event.uhid()).orElseGet(Patient::new));
+            return patientRepository.findById(event.id())
+                    .orElseGet(() -> patientRepository.findByUhid(event.uhid()).orElseGet(Patient::new));
         }
         return patientRepository.findByUhid(event.uhid()).orElseGet(Patient::new);
     }
 
-    private Doctor findDoctor(DoctorRegisteredEvent event) {
+    private Optional<Doctor> findExistingDoctor(DoctorRegisteredEvent event) {
         if (event.id() != null) {
-            return doctorRepository.findById(event.id()).orElseGet(() -> doctorRepository.findByEmail(event.email()).orElseGet(Doctor::new));
+            Optional<Doctor> byId = doctorRepository.findById(event.id());
+            if (byId.isPresent()) {
+                return byId;
+            }
         }
-        return doctorRepository.findByEmail(event.email()).orElseGet(Doctor::new);
+        return doctorRepository.findByEmail(event.email());
     }
 
     private void applyHospital(Hospital hospital, HospitalUpsertedEvent event) {
