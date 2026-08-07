@@ -100,8 +100,8 @@ public class AppointmentService {
             qr.setToken(token);
             qr.setAppointment(savedAppointment);
             qr.setPatient(patient);
-            qr.setValidFrom(LocalDateTime.now());
-            qr.setValidTo(time.plusHours(3));
+            qr.setValidFrom(time.minusHours(1));
+            qr.setValidTo(time.plusHours(1));
             qr.setUsed(false);
             qrTokenRepository.save(qr);
 
