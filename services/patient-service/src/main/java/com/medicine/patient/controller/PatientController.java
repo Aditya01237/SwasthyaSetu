@@ -7,6 +7,7 @@ import com.medicine.patient.dto.PatientRegisterRequest;
 import com.medicine.patient.dto.PatientResponse;
 import com.medicine.patient.service.PatientService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,12 +18,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/patient")
 public class PatientController {
+
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USER_ROLE_HEADER = "X-User-Role";
 
     private final PatientService patientService;
 
@@ -40,35 +45,41 @@ public class PatientController {
 
     @GetMapping("/history")
     public ResponseEntity<CommonResponse<PatientDetailsResponse>> getPatientDetails(
-            @RequestHeader(value = "X-User-Id", required = false) String uhid
+            @RequestHeader(USER_ID_HEADER) String uhid,
+            @RequestHeader(USER_ROLE_HEADER) String role
     ) {
-        requireUhid(uhid);
+        requirePatient(uhid, role);
         PatientDetailsResponse response = patientService.getPatientDetails(uhid);
         return ResponseEntity.ok(new CommonResponse<>("Patient details fetched successfully", response, 200));
     }
 
     @GetMapping("/qr-audit")
     public ResponseEntity<CommonResponse<List<AuditLogResponse>>> getAuditLogs(
-            @RequestHeader(value = "X-User-Id", required = false) String uhid
+            @RequestHeader(USER_ID_HEADER) String uhid,
+            @RequestHeader(USER_ROLE_HEADER) String role
     ) {
-        requireUhid(uhid);
+        requirePatient(uhid, role);
         List<AuditLogResponse> logs = patientService.getAuditLogs(uhid);
         return ResponseEntity.ok(new CommonResponse<>("Audit logs fetched successfully", logs, 200));
     }
 
     @PostMapping("/upload-prescription/{appointmentId}")
     public ResponseEntity<?> uploadPrescription(
-            @RequestHeader(value = "X-User-Id", required = false) String uhid,
+            @RequestHeader(USER_ID_HEADER) String uhid,
+            @RequestHeader(USER_ROLE_HEADER) String role,
             @PathVariable Long appointmentId,
             @RequestParam("file") MultipartFile file
     ) {
-        requireUhid(uhid);
+        requirePatient(uhid, role);
         return ResponseEntity.ok(patientService.processPrescription(uhid, appointmentId, file));
     }
 
-    private void requireUhid(String uhid) {
+    private void requirePatient(String uhid, String role) {
         if (uhid == null || uhid.isBlank()) {
-            throw new RuntimeException("Unauthorized: UHID missing");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated patient identity is missing");
+        }
+        if (!"PATIENT".equalsIgnoreCase(role)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "PATIENT access required");
         }
     }
 }
