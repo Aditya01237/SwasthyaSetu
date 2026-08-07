@@ -15,7 +15,7 @@ const Login = () => {
     try {
       setLoading(true);
       const res = await api.post("/auth/doctor/login", { email, password });
-      const { token, ...doctor } = res.data;
+      const { token, doctor } = res.data;
       localStorage.setItem("doctorToken", token);
       localStorage.setItem("doctor", JSON.stringify(doctor));
       navigate("/dashboard");
