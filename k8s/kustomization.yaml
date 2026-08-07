@@ -20,3 +20,5 @@ resources:
 
 patches:
   - path: internal-service-token-patch.yaml
+  - path: remove-legacy-backend-service.yaml
+  - path: remove-legacy-backend-deployment.yaml
