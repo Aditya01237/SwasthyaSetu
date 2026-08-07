@@ -1,5 +1,6 @@
 package com.medicine.hospital.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -32,7 +33,9 @@ public class Doctor {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    // Legacy compatibility only. Doctor profile service no longer owns credentials.
+    @JsonIgnore
+    @Column(nullable = true)
     private String password;
 
     @ManyToOne(fetch = FetchType.LAZY)
