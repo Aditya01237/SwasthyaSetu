@@ -17,3 +17,6 @@ resources:
   - hpa.yaml
   - elk.yaml
   - monitoring.yaml
+
+patches:
+  - path: internal-service-token-patch.yaml
