@@ -110,7 +110,6 @@ public class AuthService {
             throw new RuntimeException("Invalid password");
         }
 
-        // Upgrade old plaintext rows after the first successful login.
         if (!isBcryptHash(storedPassword)) {
             doctor.setPassword(passwordEncoder.encode(request.getPassword()));
             doctorRepository.save(doctor);
@@ -118,11 +117,7 @@ public class AuthService {
 
         DoctorLoginResponse response = new DoctorLoginResponse();
         response.setToken(jwtUtil.generateToken(String.valueOf(doctor.getId()), "DOCTOR"));
-        response.setDoctorId(doctor.getId());
-        response.setName(doctor.getName());
-        response.setEmail(doctor.getEmail());
-        response.setSpecialization(doctor.getSpecialization());
-        response.setHospitalId(doctor.getHospital() != null ? doctor.getHospital().getId() : null);
+        response.setDoctor(doctor);
         return response;
     }
 
