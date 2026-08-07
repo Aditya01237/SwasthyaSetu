@@ -2,11 +2,13 @@ package com.medicine.hospital.outbox;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "outbox_events")
 public class OutboxEvent {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Column(nullable = false, unique = true, length = 64) private String eventId;
     @Column(nullable = false) private String exchangeName;
     @Column(nullable = false) private String routingKey;
     @Column(nullable = false, columnDefinition = "TEXT") private String payload;
@@ -16,10 +18,12 @@ public class OutboxEvent {
     @Column(columnDefinition = "TEXT") private String lastError;
     protected OutboxEvent() {}
     public OutboxEvent(String exchangeName, String routingKey, String payload) {
+        this.eventId = UUID.randomUUID().toString();
         this.exchangeName = exchangeName; this.routingKey = routingKey; this.payload = payload;
         this.createdAt = LocalDateTime.now(); this.attempts = 0;
     }
     public Long getId() { return id; }
+    public String getEventId() { return eventId; }
     public String getExchangeName() { return exchangeName; }
     public String getRoutingKey() { return routingKey; }
     public String getPayload() { return payload; }
