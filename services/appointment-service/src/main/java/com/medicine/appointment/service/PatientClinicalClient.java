@@ -1,9 +1,14 @@
 package com.medicine.appointment.service;
 
+import com.medicine.appointment.dto.MedicalRecordDTO;
 import com.medicine.appointment.dto.PatientQrAccessRequest;
 import com.medicine.appointment.dto.PatientQrAccessResponse;
-import com.medicine.appointment.dto.MedicalRecordDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -13,36 +18,64 @@ import java.util.Optional;
 @Component
 public class PatientClinicalClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String patientServiceUrl;
+    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
 
-    public PatientClinicalClient(@Value("${app.services.patient-url:http://localhost:8082}") String patientServiceUrl) {
+    private final RestTemplate restTemplate;
+    private final String patientServiceUrl;
+    private final String internalServiceToken;
+
+    public PatientClinicalClient(
+            @Value("${app.services.patient-url:http://localhost:8082}") String patientServiceUrl,
+            @Value("${app.internal.service-token}") String internalServiceToken,
+            @Value("${INTERNAL_HTTP_CONNECT_TIMEOUT_MS:3000}") int connectTimeoutMs,
+            @Value("${INTERNAL_HTTP_READ_TIMEOUT_MS:5000}") int readTimeoutMs) {
         this.patientServiceUrl = patientServiceUrl;
+        this.internalServiceToken = internalServiceToken;
+        this.restTemplate = createRestTemplate(connectTimeoutMs, readTimeoutMs);
     }
 
     public PatientQrAccessResponse recordQrAccess(Long appointmentId, Long doctorId) {
-        PatientQrAccessResponse response = restTemplate.postForObject(
+        HttpHeaders headers = internalHeaders();
+        HttpEntity<PatientQrAccessRequest> request = new HttpEntity<>(
+                new PatientQrAccessRequest(doctorId, appointmentId), headers);
+
+        ResponseEntity<PatientQrAccessResponse> response = restTemplate.exchange(
                 patientServiceUrl + "/internal/appointments/" + appointmentId + "/qr-access",
-                new PatientQrAccessRequest(doctorId, appointmentId),
+                HttpMethod.POST,
+                request,
                 PatientQrAccessResponse.class
         );
 
-        if (response == null) {
+        if (response.getBody() == null) {
             throw new RuntimeException("Patient service returned empty QR access response");
         }
-
-        return response;
+        return response.getBody();
     }
 
     public Optional<MedicalRecordDTO> getMedicalRecordForAppointment(Long appointmentId) {
         try {
-            MedicalRecordDTO response = restTemplate.getForObject(
+            ResponseEntity<MedicalRecordDTO> response = restTemplate.exchange(
                     patientServiceUrl + "/internal/patients/appointments/" + appointmentId + "/medical-record",
+                    HttpMethod.GET,
+                    new HttpEntity<>(internalHeaders()),
                     MedicalRecordDTO.class
             );
-            return Optional.ofNullable(response);
+            return Optional.ofNullable(response.getBody());
         } catch (HttpClientErrorException.NotFound ex) {
             return Optional.empty();
         }
+    }
+
+    private HttpHeaders internalHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(INTERNAL_TOKEN_HEADER, internalServiceToken);
+        return headers;
+    }
+
+    private RestTemplate createRestTemplate(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(factory);
     }
 }

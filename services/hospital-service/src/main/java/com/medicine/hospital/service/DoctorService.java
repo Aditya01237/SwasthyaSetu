@@ -41,7 +41,6 @@ public class DoctorService {
         doctor.setSpecialization(request.getSpecialization());
         doctor.setFee(request.getFee());
         doctor.setEmail(request.getEmail());
-        doctor.setPassword(request.getPassword());
         doctor.setHospital(hospital);
 
         Doctor saved = doctorRepository.save(doctor);

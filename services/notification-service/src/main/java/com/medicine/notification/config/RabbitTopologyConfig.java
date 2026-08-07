@@ -20,43 +20,62 @@ public class RabbitTopologyConfig {
 
     @Bean
     public Queue appointmentBookedQueue(@Value("${app.events.queues.appointment-booked}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue appointmentBookedDlq(@Value("${app.events.queues.appointment-booked}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Queue patientRegisteredQueue(@Value("${app.events.queues.patient-registered}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue patientRegisteredDlq(@Value("${app.events.queues.patient-registered}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Queue otpRequestedQueue(@Value("${app.events.queues.otp-requested}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue otpRequestedDlq(@Value("${app.events.queues.otp-requested}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Binding appointmentBookedBinding(
-            @Qualifier("appointmentBookedQueue") Queue appointmentBookedQueue,
+            @Qualifier("appointmentBookedQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.appointment-booked}") String routingKey
-    ) {
-        return BindingBuilder.bind(appointmentBookedQueue).to(eventsExchange).with(routingKey);
+            @Value("${app.events.routing-keys.appointment-booked}") String routingKey) {
+        return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
     }
 
     @Bean
     public Binding patientRegisteredBinding(
-            @Qualifier("patientRegisteredQueue") Queue patientRegisteredQueue,
+            @Qualifier("patientRegisteredQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.patient-registered}") String routingKey
-    ) {
-        return BindingBuilder.bind(patientRegisteredQueue).to(eventsExchange).with(routingKey);
+            @Value("${app.events.routing-keys.patient-registered}") String routingKey) {
+        return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
     }
 
     @Bean
     public Binding otpRequestedBinding(
-            @Qualifier("otpRequestedQueue") Queue otpRequestedQueue,
+            @Qualifier("otpRequestedQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.otp-requested}") String routingKey
-    ) {
-        return BindingBuilder.bind(otpRequestedQueue).to(eventsExchange).with(routingKey);
+            @Value("${app.events.routing-keys.otp-requested}") String routingKey) {
+        return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
+    }
+
+    private Queue durableWithDlq(String queueName) {
+        return QueueBuilder.durable(queueName)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(queueName + ".dlq")
+                .build();
     }
 }

@@ -12,6 +12,7 @@ import com.medicine.appointment.entity.Doctor;
 import com.medicine.appointment.entity.Hospital;
 import com.medicine.appointment.entity.Patient;
 import com.medicine.appointment.entity.QRToken;
+import com.medicine.appointment.exception.AuthorizationException;
 import com.medicine.appointment.repository.AppointmentRepository;
 import com.medicine.appointment.repository.DoctorRepository;
 import com.medicine.appointment.repository.HospitalRepository;
@@ -60,8 +61,8 @@ public class AppointmentService {
     }
 
     @Transactional
-    public AppointmentResponse bookAppointment(AppointmentRequest request) {
-        Patient patient = patientRepository.findByUhid(request.getUhid())
+    public AppointmentResponse bookAppointment(AppointmentRequest request, String authenticatedPatientUhid) {
+        Patient patient = patientRepository.findByUhid(authenticatedPatientUhid)
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
 
         Hospital hospital = hospitalRepository.findById(request.getHospitalId())
@@ -99,8 +100,8 @@ public class AppointmentService {
             qr.setToken(token);
             qr.setAppointment(savedAppointment);
             qr.setPatient(patient);
-            qr.setValidFrom(LocalDateTime.now());  // valid from booking time (avoids UTC/IST mismatch)
-            qr.setValidTo(time.plusHours(3));        // valid until 3h after appointment
+            qr.setValidFrom(time.minusHours(1));
+            qr.setValidTo(time.plusHours(1));
             qr.setUsed(false);
             qrTokenRepository.save(qr);
 
@@ -116,8 +117,8 @@ public class AppointmentService {
         }
     }
 
-    public List<AppointmentListResponse> getAppointments(String uhid) {
-        Patient patient = patientRepository.findByUhid(uhid)
+    public List<AppointmentListResponse> getAppointments(String authenticatedPatientUhid) {
+        Patient patient = patientRepository.findByUhid(authenticatedPatientUhid)
                 .orElseThrow(() -> new RuntimeException("Patient not found"));
 
         return appointmentRepository.findByPatientId(patient.getId())
@@ -132,9 +133,13 @@ public class AppointmentService {
                 .toList();
     }
 
-    public AppointmentDetailsResponse getAppointmentDetails(Long id) {
+    public AppointmentDetailsResponse getAppointmentDetails(Long id, String authenticatedPatientUhid) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+        if (!appointment.getPatient().getUhid().equals(authenticatedPatientUhid)) {
+            throw new AuthorizationException("You cannot access another patient's appointment");
+        }
 
         QRToken qr = qrTokenRepository.findByAppointmentId(id)
                 .orElseThrow(() -> new RuntimeException("QR not found"));
@@ -155,12 +160,12 @@ public class AppointmentService {
         return response;
     }
 
-    public AppointmentDetailsDoctorResponse getDoctorAppointmentDetails(Long id, Long doctorId) {
+    public AppointmentDetailsDoctorResponse getDoctorAppointmentDetails(Long id, Long authenticatedDoctorId) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
-        if (!appointment.getDoctor().getId().equals(doctorId)) {
-            throw new RuntimeException("Unauthorized access");
+        if (!appointment.getDoctor().getId().equals(authenticatedDoctorId)) {
+            throw new AuthorizationException("You cannot access another doctor's appointment");
         }
 
         QRToken qr = qrTokenRepository.findByAppointmentId(appointment.getId())
@@ -176,12 +181,12 @@ public class AppointmentService {
         return response;
     }
 
-    public List<DoctorAppointmentListResponse> getTodayAppointmentsForDoctor(Long doctorId) {
+    public List<DoctorAppointmentListResponse> getTodayAppointmentsForDoctor(Long authenticatedDoctorId) {
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay = LocalDate.now().atTime(23, 59, 59);
 
         return appointmentRepository
-                .findByDoctorIdAndAppointmentTimeBetween(doctorId, startOfDay, endOfDay)
+                .findByDoctorIdAndAppointmentTimeBetween(authenticatedDoctorId, startOfDay, endOfDay)
                 .stream()
                 .map(appointment -> {
                     QRToken qr = qrTokenRepository.findByAppointmentId(appointment.getId())
@@ -223,5 +228,4 @@ public class AppointmentService {
                 appointment.getHospital().getId()
         );
     }
-
 }

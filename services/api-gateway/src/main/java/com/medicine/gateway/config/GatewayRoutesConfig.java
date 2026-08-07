@@ -6,6 +6,7 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 public class GatewayRoutesConfig {
@@ -14,18 +15,30 @@ public class GatewayRoutesConfig {
     public RouteLocator swasthyaSetuRoutes(
             RouteLocatorBuilder builder,
             JwtValidationGatewayFilter jwtValidationGatewayFilter,
-            @Value("${app.services.backend-url}") String backendUrl,
             @Value("${app.services.auth-url}") String authUrl,
             @Value("${app.services.hospital-url}") String hospitalUrl,
             @Value("${app.services.appointment-url}") String appointmentUrl,
             @Value("${app.services.patient-url}") String patientUrl
     ) {
         return builder.routes()
-                .route("auth-service", route -> route
+                .route("admin-login-public", route -> route
+                        .path("/api/auth/admin/login")
+                        .uri(authUrl))
+                .route("admin-management-protected", route -> route
+                        .path("/api/auth/admin/**")
+                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
+                        .uri(authUrl))
+                .route("auth-service-public", route -> route
                         .path("/api/auth/**")
                         .uri(authUrl))
-                .route("hospital-service", route -> route
+                .route("hospital-service-public", route -> route
+                        .method(HttpMethod.GET)
+                        .and()
                         .path("/api/hospital/**", "/api/doctor/hospital/**")
+                        .uri(hospitalUrl))
+                .route("hospital-service-protected", route -> route
+                        .path("/api/hospital/**")
+                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
                         .uri(hospitalUrl))
                 .route("doctor-service-protected", route -> route
                         .path("/api/doctor/**")
@@ -42,10 +55,6 @@ public class GatewayRoutesConfig {
                         .path("/api/patient/**")
                         .filters(filter -> filter.filter(jwtValidationGatewayFilter))
                         .uri(patientUrl))
-                .route("protected-monolith-transition", route -> route
-                        .path("/api/**")
-                        .filters(filter -> filter.filter(jwtValidationGatewayFilter))
-                        .uri(backendUrl))
                 .build();
     }
 }

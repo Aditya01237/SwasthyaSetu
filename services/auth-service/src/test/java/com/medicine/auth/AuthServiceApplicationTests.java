@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.flyway.enabled=false",
         "spring.rabbitmq.host=localhost",
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "management.health.rabbit.enabled=false",

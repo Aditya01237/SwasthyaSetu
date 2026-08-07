@@ -17,7 +17,6 @@ import lombok.NoArgsConstructor;
 @Table(name = "doctors")
 public class Doctor {
 
-    /** Same id as auth-service / appointment-service (event-sourced read model). */
     @Id
     private Long id;
 
@@ -28,9 +27,6 @@ public class Doctor {
 
     @Column(nullable = false, unique = true)
     private String email;
-
-    @Column(nullable = false)
-    private String password;
 
     @ManyToOne
     @JoinColumn(name = "hospital_id")

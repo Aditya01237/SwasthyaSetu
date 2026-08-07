@@ -9,6 +9,5 @@ public class DoctorRegisterRequest {
     private int experience;
     private int fee;
     private String email;
-    private String password;
     private String hospitalId;
 }

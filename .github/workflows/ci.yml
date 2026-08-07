@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "agent/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  java-services:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - patient-service
+          - appointment-service
+          - hospital-service
+          - notification-service
+          - api-gateway
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: services/${{ matrix.service }}/pom.xml
+
+      - name: Test
+        run: mvn --batch-mode --no-transfer-progress test
+
+  frontend-build:
+    name: Build ${{ matrix.frontend }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend:
+          - swasthya-frontend
+          - doctor-frontend
+    defaults:
+      run:
+        working-directory: ${{ matrix.frontend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ${{ matrix.frontend }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  migration-smoke:
+    name: Fresh PostgreSQL migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Create service databases
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for db in auth_db patient_db appointment_db hospital_db; do
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db};"
+          done
+
+      - name: Apply Flyway SQL in version order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          apply_migrations() {
+            db="$1"
+            directory="$2"
+            while IFS= read -r file; do
+              echo "Applying ${file} to ${db}"
+              psql -h localhost -U postgres -d "${db}" -v ON_ERROR_STOP=1 -f "${file}"
+            done < <(find "${directory}" -maxdepth 1 -type f -name 'V*.sql' | sort -V)
+          }
+
+          apply_migrations auth_db services/auth-service/src/main/resources/db/migration
+          apply_migrations patient_db services/patient-service/src/main/resources/db/migration
+          apply_migrations appointment_db services/appointment-service/src/main/resources/db/migration
+          apply_migrations hospital_db services/hospital-service/src/main/resources/db/migration
+
+      - name: Verify credential ownership
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for db in patient_db appointment_db hospital_db; do
+            count=$(psql -h localhost -U postgres -d "${db}" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_name='doctors' AND column_name='password';")
+            test "${count}" = "0"
+          done
+          auth_count=$(psql -h localhost -U postgres -d auth_db -tAc "SELECT count(*) FROM information_schema.columns WHERE table_name='doctors' AND column_name='password';")
+          test "${auth_count}" = "1"
+
+  kubernetes-render:
+    name: Render Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Render base manifests
+        run: kubectl kustomize k8s > /tmp/swasthya-base.yaml
+
+      - name: Render production manifests
+        run: kubectl kustomize k8s-production > /tmp/swasthya-production.yaml
+
+      - name: Verify legacy backend is absent
+        run: |
+          if grep -Eq '^[[:space:]]*name:[[:space:]]*backend[[:space:]]*$' /tmp/swasthya-base.yaml; then
+            echo "Legacy backend resource is still present in base manifests"
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*name:[[:space:]]*backend[[:space:]]*$' /tmp/swasthya-production.yaml; then
+            echo "Legacy backend resource is still present in production manifests"
+            exit 1
+          fi

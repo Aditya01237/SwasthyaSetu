@@ -1,6 +1,7 @@
 package com.medicine.auth.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -31,11 +32,21 @@ public class JwtUtil {
     }
 
     public String generateToken(String userId, String role) {
-        return Jwts.builder()
+        return generateToken(userId, role, null);
+    }
+
+    public String generateToken(String userId, String role, String hospitalId) {
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(userId)
                 .claim("role", role)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration));
+
+        if (hospitalId != null && !hospitalId.isBlank()) {
+            builder.claim("hospitalId", hospitalId);
+        }
+
+        return builder
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

@@ -1,6 +1,8 @@
 package com.medicine.auth.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -21,9 +23,18 @@ import lombok.NoArgsConstructor;
 @Table(name = "doctors")
 public class Doctor {
 
+    // Credential/account identity is internal to auth-service and is never
+    // exposed as the doctor-domain identity.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonIgnore
     private Long id;
+
+    // Domain doctor-profile identity owned by hospital-service. Serialize it as
+    // `id` so existing doctor-frontend session shape remains compatible.
+    @Column(unique = true)
+    @JsonProperty("id")
+    private Long profileId;
 
     private String name;
     private String specialization;
@@ -33,6 +44,7 @@ public class Doctor {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 

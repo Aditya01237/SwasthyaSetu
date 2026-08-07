@@ -18,6 +18,10 @@ import java.security.Key;
 @Component
 public class JwtValidationGatewayFilter implements GatewayFilter {
 
+    private static final String USER_ID_HEADER = "X-User-Id";
+    private static final String USER_ROLE_HEADER = "X-User-Role";
+    private static final String HOSPITAL_ID_HEADER = "X-Hospital-Id";
+
     private final Key signingKey;
 
     public JwtValidationGatewayFilter(@Value("${jwt.secret}") String secret) {
@@ -45,7 +49,8 @@ public class JwtValidationGatewayFilter implements GatewayFilter {
                     .getBody();
 
             String subject = claims.getSubject();
-            if (subject == null || subject.isBlank()) {
+            Object role = claims.get("role");
+            if (subject == null || subject.isBlank() || role == null || role.toString().isBlank()) {
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
@@ -53,10 +58,17 @@ public class JwtValidationGatewayFilter implements GatewayFilter {
             ServerHttpRequest mutatedRequest = exchange.getRequest()
                     .mutate()
                     .headers(headers -> {
-                        headers.set("X-User-Id", subject);
-                        Object role = claims.get("role");
-                        if (role != null) {
-                            headers.set("X-User-Role", role.toString());
+                        // Never trust caller-provided identity headers. They are rebuilt only
+                        // from the validated JWT claims at the gateway boundary.
+                        headers.remove(USER_ID_HEADER);
+                        headers.remove(USER_ROLE_HEADER);
+                        headers.remove(HOSPITAL_ID_HEADER);
+                        headers.set(USER_ID_HEADER, subject);
+                        headers.set(USER_ROLE_HEADER, role.toString());
+
+                        Object hospitalId = claims.get("hospitalId");
+                        if (hospitalId != null && !hospitalId.toString().isBlank()) {
+                            headers.set(HOSPITAL_ID_HEADER, hospitalId.toString());
                         }
                     })
                     .build();

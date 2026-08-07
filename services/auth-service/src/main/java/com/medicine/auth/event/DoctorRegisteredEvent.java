@@ -7,7 +7,6 @@ public record DoctorRegisteredEvent(
         int experience,
         int fee,
         String email,
-        String password,
         String hospitalId
 ) {
 }

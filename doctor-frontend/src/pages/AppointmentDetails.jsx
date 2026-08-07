@@ -7,8 +7,6 @@ const AppointmentDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const doctor = JSON.parse(localStorage.getItem("doctor"));
-
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -24,7 +22,7 @@ const AppointmentDetails = () => {
 
   const fetchAppointment = async () => {
     try {
-      const res = await api.get(`/appointment/doctor/${id}?doctorId=${doctor.id}`);
+      const res = await api.get(`/appointment/doctor/${id}`);
       setAppointment(res.data);
       if (res.data.isValid === true) setVerified(true);
     } catch (err) {
@@ -50,7 +48,6 @@ const AppointmentDetails = () => {
   useEffect(() => {
     if (!isScanning) return;
 
-    // Prevent double-init (React 18 Strict Mode)
     if (scannerRef.current) return;
 
     isProcessingRef.current = false;
@@ -68,14 +65,11 @@ const AppointmentDetails = () => {
         if (isProcessingRef.current) return;
         isProcessingRef.current = true;
 
-        // Stop camera immediately
         await stopScanner();
 
-        // Then call API
         try {
           const res = await api.post("/qr/scan", {
             token: decodedText,
-            doctorId: doctor.id,
           });
           setScanData(res.data.data);
           setVerified(true);
@@ -93,7 +87,6 @@ const AppointmentDetails = () => {
     });
 
     return () => {
-      // Cleanup on unmount
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
         scannerRef.current = null;

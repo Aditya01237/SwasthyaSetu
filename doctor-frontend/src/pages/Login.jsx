@@ -40,7 +40,6 @@ const Login = () => {
       >
         <div className="bg-[#1a1f2e] border border-white/[0.07] rounded-2xl p-8">
 
-          {/* Logo */}
           <div className="flex flex-col items-center gap-2 mb-6">
             <div className="w-20 h-20 rounded-2xl bg-white p-2 flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <img
@@ -53,7 +52,6 @@ const Login = () => {
             <p className="text-sm text-gray-500">Login to your doctor portal</p>
           </div>
 
-          {/* Toggle */}
           <div className="flex bg-[#111827] rounded-full p-1 mb-7">
             <button
               className="flex-1 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
@@ -69,7 +67,6 @@ const Login = () => {
             </button>
           </div>
 
-          {/* Fields */}
           <div className="space-y-4">
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 tracking-widest uppercase mb-2">

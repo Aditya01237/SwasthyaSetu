@@ -10,7 +10,6 @@ public record DoctorReadModelSnapshot(
         String specialization,
         int experience,
         int fee,
-        String password,
         String hospitalId
 ) {
 }

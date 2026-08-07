@@ -4,21 +4,39 @@ import com.medicine.notification.dto.AppointmentBookedEvent;
 import com.medicine.notification.dto.OtpRequestedEvent;
 import com.medicine.notification.dto.PatientRegisteredEvent;
 import com.medicine.notification.service.EmailService;
+import com.medicine.notification.service.EventIdempotencyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class NotificationEventListenerTest {
 
-    private RecordingEmailService emailService;
+    private EmailService emailService;
+    private EventIdempotencyService idempotencyService;
     private NotificationEventListener listener;
 
     @BeforeEach
     void setUp() {
-        emailService = new RecordingEmailService();
-        listener = new NotificationEventListener(new ObjectMapper(), emailService);
+        emailService = mock(EmailService.class);
+        idempotencyService = mock(EventIdempotencyService.class);
+        doAnswer(invocation -> {
+            Runnable action = invocation.getArgument(1);
+            action.run();
+            return null;
+        }).when(idempotencyService).processOnce(any(), any(Runnable.class));
+
+        listener = new NotificationEventListener(new ObjectMapper(), emailService, idempotencyService);
     }
 
     @Test
@@ -36,10 +54,12 @@ class NotificationEventListenerTest {
                 }
                 """;
 
-        listener.handleAppointmentBooked(payload);
+        listener.handleAppointmentBooked(message("appointment-1", payload));
 
-        assertThat(emailService.appointmentBookedEvent.patientEmail()).isEqualTo("patient@example.com");
-        assertThat(emailService.appointmentBookedEvent.qrToken()).isEqualTo("qr-token");
+        ArgumentCaptor<AppointmentBookedEvent> captor = ArgumentCaptor.forClass(AppointmentBookedEvent.class);
+        verify(emailService).sendAppointmentConfirmationEmail(captor.capture());
+        assertThat(captor.getValue().patientEmail()).isEqualTo("patient@example.com");
+        assertThat(captor.getValue().qrToken()).isEqualTo("qr-token");
     }
 
     @Test
@@ -52,10 +72,12 @@ class NotificationEventListenerTest {
                 }
                 """;
 
-        listener.handlePatientRegistered(payload);
+        listener.handlePatientRegistered(message("patient-1", payload));
 
-        assertThat(emailService.patientRegisteredEvent.uhid()).isEqualTo("UHID123");
-        assertThat(emailService.patientRegisteredEvent.email()).isEqualTo("patient@example.com");
+        ArgumentCaptor<PatientRegisteredEvent> captor = ArgumentCaptor.forClass(PatientRegisteredEvent.class);
+        verify(emailService).sendPatientRegisteredEmail(captor.capture());
+        assertThat(captor.getValue().uhid()).isEqualTo("UHID123");
+        assertThat(captor.getValue().email()).isEqualTo("patient@example.com");
     }
 
     @Test
@@ -67,35 +89,17 @@ class NotificationEventListenerTest {
                 }
                 """;
 
-        listener.handleOtpRequested(payload);
+        listener.handleOtpRequested(message("otp-1", payload));
 
-        assertThat(emailService.otpRequestedEvent.email()).isEqualTo("patient@example.com");
-        assertThat(emailService.otpRequestedEvent.otp()).isEqualTo("123456");
+        ArgumentCaptor<OtpRequestedEvent> captor = ArgumentCaptor.forClass(OtpRequestedEvent.class);
+        verify(emailService).sendOtpEmail(captor.capture());
+        assertThat(captor.getValue().email()).isEqualTo("patient@example.com");
+        assertThat(captor.getValue().otp()).isEqualTo("123456");
     }
 
-    private static class RecordingEmailService extends EmailService {
-
-        private AppointmentBookedEvent appointmentBookedEvent;
-        private PatientRegisteredEvent patientRegisteredEvent;
-        private OtpRequestedEvent otpRequestedEvent;
-
-        RecordingEmailService() {
-            super(null, "");
-        }
-
-        @Override
-        public void sendAppointmentConfirmationEmail(AppointmentBookedEvent event) {
-            this.appointmentBookedEvent = event;
-        }
-
-        @Override
-        public void sendPatientRegisteredEmail(PatientRegisteredEvent event) {
-            this.patientRegisteredEvent = event;
-        }
-
-        @Override
-        public void sendOtpEmail(OtpRequestedEvent event) {
-            this.otpRequestedEvent = event;
-        }
+    private Message message(String id, String payload) {
+        MessageProperties properties = new MessageProperties();
+        properties.setMessageId(id);
+        return new Message(payload.getBytes(StandardCharsets.UTF_8), properties);
     }
 }

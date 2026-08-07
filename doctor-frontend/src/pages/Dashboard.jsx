@@ -11,11 +11,7 @@ const Dashboard = () => {
 
   const fetchAppointments = async () => {
     try {
-      if (!doctor?.id) {
-        console.error("Doctor ID missing");
-        return;
-      }
-      const res = await api.get(`/appointment/doctor/today?doctorId=${doctor.id}`);
+      const res = await api.get("/appointment/doctor/today");
       setAppointments(res.data);
     } catch (err) {
       console.error("ERROR:", err.response?.data || err.message);
@@ -34,7 +30,7 @@ const Dashboard = () => {
   const getStatus = (appt) => {
     const now = new Date();
     const apptTime = new Date(appt.time);
-    const expiryTime = new Date(apptTime.getTime() + 3 * 60 * 60 * 1000); // QR is valid for +3 hours
+    const expiryTime = new Date(apptTime.getTime() + 60 * 60 * 1000); // QR window ends 1 hour after appointment
 
     // Jackson JSON mapper typically strips 'is' from boolean fields, so 'isValid' becomes 'valid'
     if (appt.valid || appt.isValid) return "DONE";

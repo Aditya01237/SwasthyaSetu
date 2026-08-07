@@ -7,7 +7,6 @@ server:
 
 app:
   services:
-    backend-url: ${BACKEND_URL:http://localhost:8081}
     auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
     hospital-url: ${HOSPITAL_SERVICE_URL:http://localhost:8084}
     appointment-url: ${APPOINTMENT_SERVICE_URL:http://localhost:8083}
