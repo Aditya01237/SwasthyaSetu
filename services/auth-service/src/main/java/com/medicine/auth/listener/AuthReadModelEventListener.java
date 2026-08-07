@@ -111,14 +111,16 @@ public class AuthReadModelEventListener {
                 }
 
                 Doctor doctor = existing.get();
+                doctor.setProfileId(event.id());
                 doctor.setName(event.name());
                 doctor.setSpecialization(event.specialization());
                 doctor.setExperience(event.experience());
                 doctor.setFee(event.fee());
-                doctor.setEmail(event.email());
+                doctor.setEmail(event.email().trim().toLowerCase());
                 hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
                 doctorRepository.save(doctor);
-                log.info("Synced doctor profile {} (email={}) into auth account", event.name(), event.email());
+                log.info("Synced doctor profile {} (profileId={}, email={}) into auth account",
+                        event.name(), event.id(), event.email());
                 return null;
             } catch (Exception ex) {
                 status.setRollbackOnly();
@@ -137,7 +139,7 @@ public class AuthReadModelEventListener {
 
     private void upsertInvitation(DoctorRegisteredEvent event) {
         DoctorInvitation invitation = doctorInvitationRepository.findById(event.id())
-                .orElseGet(() -> doctorInvitationRepository.findByEmail(event.email())
+                .orElseGet(() -> doctorInvitationRepository.findByEmail(event.email().trim().toLowerCase())
                         .orElseGet(DoctorInvitation::new));
         invitation.setDoctorId(event.id());
         invitation.setEmail(event.email().trim().toLowerCase());
@@ -161,10 +163,10 @@ public class AuthReadModelEventListener {
 
     private Optional<Doctor> findExistingDoctor(DoctorRegisteredEvent event) {
         if (event.id() != null) {
-            Optional<Doctor> byId = doctorRepository.findById(event.id());
-            if (byId.isPresent()) return byId;
+            Optional<Doctor> byProfileId = doctorRepository.findByProfileId(event.id());
+            if (byProfileId.isPresent()) return byProfileId;
         }
-        return doctorRepository.findByEmail(event.email());
+        return doctorRepository.findByEmail(event.email().trim().toLowerCase());
     }
 
     private void applyHospital(Hospital hospital, HospitalUpsertedEvent event) {
