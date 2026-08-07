@@ -1,10 +1,13 @@
 package com.medicine.auth.dto;
 
-import com.medicine.auth.entity.Doctor;
 import lombok.Data;
 
 @Data
 public class DoctorLoginResponse {
     private String token;
-    private Doctor doctor;
+    private Long doctorId;
+    private String name;
+    private String email;
+    private String specialization;
+    private String hospitalId;
 }
