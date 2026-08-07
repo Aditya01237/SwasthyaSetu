@@ -3,6 +3,10 @@ package com.medicine.patient.client;
 import com.medicine.patient.dto.AppointmentReadModelSnapshot;
 import com.medicine.patient.dto.DoctorReadModelSnapshot;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -12,25 +16,31 @@ import java.util.Optional;
 @Component
 public class AppointmentReadModelClient {
 
+    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
+
     private final RestTemplate restTemplate = new RestTemplate();
     private final String appointmentServiceBaseUrl;
+    private final String internalServiceToken;
 
     public AppointmentReadModelClient(
-            @Value("${APPOINTMENT_SERVICE_URL:http://localhost:8083}") String appointmentServiceBaseUrl
-    ) {
+            @Value("${APPOINTMENT_SERVICE_URL:http://localhost:8083}") String appointmentServiceBaseUrl,
+            @Value("${app.internal.service-token}") String internalServiceToken) {
         this.appointmentServiceBaseUrl = appointmentServiceBaseUrl;
+        this.internalServiceToken = internalServiceToken;
     }
 
     public AppointmentReadModelSnapshot fetchSnapshot(Long appointmentId) {
         try {
-            AppointmentReadModelSnapshot snapshot = restTemplate.getForObject(
+            ResponseEntity<AppointmentReadModelSnapshot> response = restTemplate.exchange(
                     appointmentServiceBaseUrl + "/internal/appointments/" + appointmentId + "/read-model",
+                    HttpMethod.GET,
+                    new HttpEntity<>(internalHeaders()),
                     AppointmentReadModelSnapshot.class
             );
-            if (snapshot == null) {
+            if (response.getBody() == null) {
                 throw new RuntimeException("Appointment not found");
             }
-            return snapshot;
+            return response.getBody();
         } catch (HttpClientErrorException.NotFound ex) {
             throw new RuntimeException("Appointment not found", ex);
         }
@@ -38,12 +48,21 @@ public class AppointmentReadModelClient {
 
     public Optional<DoctorReadModelSnapshot> fetchDoctorSnapshot(Long doctorId) {
         try {
-            return Optional.ofNullable(restTemplate.getForObject(
+            ResponseEntity<DoctorReadModelSnapshot> response = restTemplate.exchange(
                     appointmentServiceBaseUrl + "/internal/doctors/" + doctorId + "/read-model",
+                    HttpMethod.GET,
+                    new HttpEntity<>(internalHeaders()),
                     DoctorReadModelSnapshot.class
-            ));
+            );
+            return Optional.ofNullable(response.getBody());
         } catch (HttpClientErrorException.NotFound ex) {
             return Optional.empty();
         }
+    }
+
+    private HttpHeaders internalHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(INTERNAL_TOKEN_HEADER, internalServiceToken);
+        return headers;
     }
 }
