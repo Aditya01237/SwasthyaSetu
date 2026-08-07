@@ -30,7 +30,8 @@ public class NotificationEventListener {
             emailService.sendAppointmentConfirmationEmail(event);
             log.info("Processed appointment.booked notification for {}", event.patientEmail());
         } catch (Exception ex) {
-            log.error("Failed to process appointment.booked notification", ex);
+            log.error("Failed to process appointment.booked notification; message will be retried", ex);
+            throw new RuntimeException("appointment.booked notification failed", ex);
         }
     }
 
@@ -41,7 +42,8 @@ public class NotificationEventListener {
             emailService.sendPatientRegisteredEmail(event);
             log.info("Processed patient.registered notification for {}", event.email());
         } catch (Exception ex) {
-            log.error("Failed to process patient.registered notification", ex);
+            log.error("Failed to process patient.registered notification; message will be retried", ex);
+            throw new RuntimeException("patient.registered notification failed", ex);
         }
     }
 
@@ -52,7 +54,8 @@ public class NotificationEventListener {
             emailService.sendOtpEmail(event);
             log.info("Processed auth.otp-requested notification for {}", event.email());
         } catch (Exception ex) {
-            log.error("Failed to process auth.otp-requested notification", ex);
+            log.error("Failed to process auth.otp-requested notification; message will be retried", ex);
+            throw new RuntimeException("auth.otp-requested notification failed", ex);
         }
     }
 }
