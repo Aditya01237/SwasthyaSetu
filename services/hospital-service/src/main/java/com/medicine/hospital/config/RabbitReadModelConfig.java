@@ -20,15 +20,26 @@ public class RabbitReadModelConfig {
 
     @Bean
     public Queue hospitalDoctorRegisteredQueue(@Value("${app.events.queues.hospital-doctor-registered}") String queueName) {
-        return QueueBuilder.durable(queueName).build();
+        return durableWithDlq(queueName);
+    }
+
+    @Bean
+    public Queue hospitalDoctorRegisteredDlq(@Value("${app.events.queues.hospital-doctor-registered}") String queueName) {
+        return QueueBuilder.durable(queueName + ".dlq").build();
     }
 
     @Bean
     public Binding hospitalDoctorRegisteredBinding(
             @Qualifier("hospitalDoctorRegisteredQueue") Queue queue,
             TopicExchange eventsExchange,
-            @Value("${app.events.routing-keys.doctor-registered}") String routingKey
-    ) {
+            @Value("${app.events.routing-keys.doctor-registered}") String routingKey) {
         return BindingBuilder.bind(queue).to(eventsExchange).with(routingKey);
+    }
+
+    private Queue durableWithDlq(String queueName) {
+        return QueueBuilder.durable(queueName)
+                .deadLetterExchange("")
+                .deadLetterRoutingKey(queueName + ".dlq")
+                .build();
     }
 }
