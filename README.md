@@ -1,229 +1,466 @@
 # SwasthyaSetu
 
-SwasthyaSetu ("Health Bridge") is a healthcare appointment and patient-record
-platform built around Spring Boot microservices. It provides separate patient
-and doctor experiences, OTP-based authentication, appointment booking,
-QR-controlled record access, asynchronous notifications, and a complete local
-DevOps path from Docker Compose to Kubernetes.
+SwasthyaSetu ("Health Bridge") is a healthcare platform for digital appointment booking, unified patient records, controlled doctor access, and reliable asynchronous notifications.
 
-## Product highlights
+The system is built as Spring Boot microservices behind a Spring Cloud API Gateway, with React applications for patients and doctors, PostgreSQL for service data, Redis for slot locking and idempotency, RabbitMQ for domain events, and Kubernetes for deployment and scaling.
 
-- Patient registration and time-limited OTP authentication.
-- Hospital and doctor discovery with appointment scheduling.
-- Redis-backed slot locks that prevent concurrent double booking.
-- QR-based appointment verification before medical-record access or
-  prescription upload.
-- Audit records for QR scans and patient-record access.
-- RabbitMQ events for OTP, registration, appointment, hospital, and doctor
-  workflows.
-- Patient and doctor React applications behind a Spring Cloud API Gateway.
-- Docker Compose development stack with PostgreSQL, Redis, RabbitMQ, Mailpit,
-  and a Python AI service.
-- Jenkins, Docker, Ansible, Minikube, Kubernetes HPA, HashiCorp Vault, and ELK
-  deployment support.
+The current architecture has been hardened around authentication, authorization, database ownership, event reliability, internal-service isolation, and production deployment.
+
+## What the platform provides
+
+- Patient registration and OTP-based authentication.
+- Hospital and doctor discovery.
+- Appointment booking with Redis-backed protection against double booking.
+- Invitation-only doctor onboarding managed by hospital administrators.
+- `ADMIN` and hospital-scoped `HOSPITAL_ADMIN` authorization.
+- Unified patient medical history and prescription storage.
+- QR-based, time-limited access to patient records for the assigned doctor.
+- Audit logs for QR scans and clinical-record access.
+- Asynchronous OTP, registration, appointment, hospital, and doctor events through RabbitMQ.
+- Transactional Outbox delivery with retry/DLQ handling.
+- Redis-backed notification idempotency to avoid duplicate email delivery.
+- Local QR generation with ZXing so access tokens are not sent to a third-party QR service.
+- Python OCR/prescription processing that fails closed unless explicit demo mode is enabled.
+- Docker Compose for local development and Kubernetes/Kustomize for deployment.
+- GitHub Actions, Jenkins, Ansible, Prometheus/Grafana, and ELK support.
+
+---
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    PatientUI[Patient React UI] --> Gateway[Spring API Gateway]
-    DoctorUI[Doctor React UI] --> Gateway
+    PatientUI[Patient React App] --> Gateway[Spring Cloud API Gateway]
+    DoctorUI[Doctor React App] --> Gateway
 
-    Gateway --> Auth[Auth service]
-    Gateway --> Patient[Patient service]
-    Gateway --> Hospital[Hospital service]
-    Gateway --> Appointment[Appointment service]
-    Gateway --> Backend[Legacy backend]
+    Gateway --> Auth[Auth Service]
+    Gateway --> Hospital[Hospital Service]
+    Gateway --> Appointment[Appointment Service]
+    Gateway --> Patient[Patient Service]
 
-    Auth --> PostgreSQL[(PostgreSQL)]
-    Patient --> PostgreSQL
-    Hospital --> PostgreSQL
-    Appointment --> PostgreSQL
-    Backend --> PostgreSQL
+    Auth --> AuthDB[(Auth DB)]
+    Hospital --> HospitalDB[(Hospital DB)]
+    Appointment --> AppointmentDB[(Appointment DB)]
+    Patient --> PatientDB[(Patient DB)]
 
-    Appointment --> Redis[(Redis slot locks)]
-    Patient --> AI[Python AI service]
+    Appointment --> Redis[(Redis)]
+    Notification --> Redis
+
+    Appointment --> Patient
+    Patient --> Appointment
+    Patient --> AI[Python AI/OCR Service]
 
     Auth --> RabbitMQ[(RabbitMQ)]
-    Patient --> RabbitMQ
     Hospital --> RabbitMQ
     Appointment --> RabbitMQ
-    RabbitMQ --> Notification[Notification service]
-    Notification --> Mail[Mailpit or SMTP]
+    Patient --> RabbitMQ
+
+    RabbitMQ --> Notification[Notification Service]
+    Notification --> SMTP[Mailpit / SMTP]
 ```
 
-Both React applications send requests through the API Gateway. Domain services
-own authentication, patients, hospitals, appointments, and notifications.
-PostgreSQL stores operational data, Redis serializes competing appointment
-requests, and RabbitMQ distributes domain events without coupling producers to
-email delivery or downstream read models. The patient service also calls the
-Python AI service for prescription processing.
+All browser traffic enters through the API Gateway. The gateway validates JWTs and rebuilds trusted identity headers before forwarding the request to a domain service.
 
-## Delivery architecture
+In the deployment architecture, each domain service owns its database. For a simpler local setup, the default Compose file can point the services to one PostgreSQL database; `docker-compose.service-dbs.yml` can be layered on top to use separate logical databases such as `auth_db`, `patient_db`, `appointment_db`, and `hospital_db`.
 
-```mermaid
-flowchart LR
-    GitHub[GitHub repository] --> Jenkins[Jenkins pipeline]
-    Jenkins --> Validate[Config validation and tests]
-    Validate --> Images[Docker image builds]
-    Vault[HashiCorp Vault] --> Jenkins
-    Images --> Registry[Container registry]
-    Registry --> Ansible[Ansible deployment]
-    Ansible --> Minikube[Minikube Kubernetes]
-    Minikube --> HPA[HPA and metrics-server]
-    Minikube --> ELK[Elasticsearch, Logstash, Kibana]
-```
+The historical `services/backend` source directory may still exist in the repository for reference, but it is not part of the active runtime: it is not routed by the gateway, started by the default Compose stack, rendered as a Kubernetes Service/Deployment, or scraped as an active application service.
 
-The pipeline validates configuration, tests Java services, builds both
-frontends, checks the AI service, builds and publishes images, deploys the stack
-to Minikube through Ansible, and injects SMTP configuration from Vault.
+---
 
 ## Services
 
-| Component | Default port | Responsibility |
+| Component | Internal port | Responsibility |
 | --- | ---: | --- |
-| `api-gateway` | `8080` | Public routing and JWT-aware API entry point |
-| `auth-service` | `8081` | Patient/doctor OTP and authentication flow |
-| `patient-service` | `8082` | Patient profiles, history, QR audit, prescriptions |
-| `appointment-service` | `8083` | Booking, slots, QR validation, Redis locking |
-| `hospital-service` | `8084` | Hospital and doctor information |
-| `notification-service` | `8086` | RabbitMQ consumers and email notifications |
-| `backend` | `8090` | Legacy/transition backend capabilities |
-| `ai-service` | `8000` | Python prescription-processing service |
-| `swasthya-frontend` | `5173` | Patient web application |
-| `doctor-frontend` | `5174` | Doctor web application |
+| `api-gateway` | `8080` | Public API entry point, JWT validation, trusted identity propagation |
+| `auth-service` | `8081` | Patient OTP auth, doctor credentials/invitations, admin authentication |
+| `patient-service` | `8082` | Patient profiles, medical history, prescriptions, QR audit |
+| `appointment-service` | `8083` | Appointments, slot locking, QR token lifecycle and access checks |
+| `hospital-service` | `8084` | Hospitals, doctor profiles and hospital-scoped management |
+| `notification-service` | `8086` | RabbitMQ consumers, QR email generation and idempotent notifications |
+| `ai-service` | `8000` | Prescription OCR/processing API |
+| `swasthya-frontend` | `5173` host | Patient web application |
+| `doctor-frontend` | `5174` host | Doctor web application |
 
-## Technology
+Only the API Gateway and the two frontends are published to the host by the default Compose stack. Databases, Redis, RabbitMQ, AI, and individual microservice ports stay internal to the Docker network.
 
-| Layer | Stack |
+For direct debugging, use `docker-compose.dev-ports.yml` explicitly.
+
+---
+
+## Security model
+
+### JWT identity
+
+After authentication, the API Gateway validates the JWT and removes caller-supplied identity headers before rebuilding trusted headers such as:
+
+```text
+X-User-Id
+X-User-Role
+X-Hospital-Id   # when applicable
+```
+
+Domain services authorize requests using those trusted values rather than IDs sent in request bodies or query parameters.
+
+Examples:
+
+- A patient cannot request another patient's appointments by changing a UHID parameter.
+- A doctor cannot request another doctor's appointment details by changing a doctor ID.
+- A QR scan is checked against the authenticated doctor and the appointment assigned to that doctor.
+- A `HOSPITAL_ADMIN` can manage only the hospital carried in the trusted JWT hospital claim.
+
+### Roles
+
+The platform supports these important roles:
+
+```text
+PATIENT
+DOCTOR
+HOSPITAL_ADMIN
+ADMIN
+```
+
+`ADMIN` is the global administrative role. `HOSPITAL_ADMIN` is scoped to one hospital.
+
+The root admin is bootstrap-only and can be created from deployment secrets/environment variables. There is no public root-admin signup flow.
+
+### Credential ownership
+
+Doctor passwords are owned only by `auth-service` and stored with BCrypt.
+
+Patient, appointment, and hospital read models do not store doctor passwords. Flyway migrations physically remove legacy password columns from those service schemas.
+
+---
+
+## Doctor onboarding
+
+Doctor creation is invitation-based rather than public self-registration.
+
+```mermaid
+sequenceDiagram
+    participant Admin as ADMIN / HOSPITAL_ADMIN
+    participant Hospital as Hospital Service
+    participant MQ as RabbitMQ
+    participant Auth as Auth Service
+    participant Doctor as Doctor
+
+    Admin->>Hospital: Create doctor profile
+    Hospital->>MQ: doctor.registered event
+    MQ->>Auth: Synchronize doctor profile
+    Auth->>Auth: Create pending invitation
+    Doctor->>Auth: Request OTP with invited email
+    Auth->>Doctor: OTP notification
+    Doctor->>Auth: Verify OTP
+    Doctor->>Auth: Set password / activate account
+    Auth->>Doctor: JWT with doctor profile identity
+```
+
+The hospital service owns the doctor profile identity. Auth service owns the login account. These are intentionally separate identities; the doctor JWT uses the hospital-owned profile ID because appointments reference that doctor profile.
+
+---
+
+## Appointment booking flow
+
+```mermaid
+sequenceDiagram
+    participant P as Patient
+    participant G as API Gateway
+    participant A as Appointment Service
+    participant R as Redis
+    participant DB as Appointment DB
+    participant O as Outbox
+    participant MQ as RabbitMQ
+
+    P->>G: Book doctor + date/time
+    G->>A: Authenticated PATIENT request
+    A->>R: Acquire doctor/time slot lock
+    R-->>A: Lock acquired
+    A->>DB: Validate slot and save appointment + QR token
+    A->>O: Save appointment.booked event in same transaction
+    A-->>P: Booking confirmed
+    O->>MQ: Publish asynchronously
+```
+
+Redis protects the critical booking window from concurrent requests. The database remains the durable source of truth, while the outbox guarantees that successful business transactions are not silently separated from their domain events.
+
+---
+
+## QR-controlled medical access
+
+A QR token is created for an appointment and is valid only around the appointment time.
+
+Current window:
+
+```text
+validFrom = appointmentTime - 1 hour
+validTo   = appointmentTime + 1 hour
+```
+
+For example, a `1:00 PM` appointment produces a QR access window from `12:00 PM` to `2:00 PM`.
+
+The QR request contains only the QR token. Doctor identity comes from the validated JWT.
+
+The server verifies:
+
+1. the QR token exists;
+2. it is inside its time window;
+3. it has not already been consumed when single-use semantics apply;
+4. the QR belongs to an appointment assigned to the authenticated doctor;
+5. the internal patient-record request carries the internal service credential.
+
+The patient service records the corresponding audit information when clinical data is accessed.
+
+---
+
+## OTP protection
+
+Authentication OTPs use `SecureRandom` and include abuse controls:
+
+- configurable OTP lifetime;
+- resend cooldown;
+- configurable maximum failed attempts;
+- persisted failed-attempt counters;
+- invalidation of expired or exhausted OTP records.
+
+OTP notifications are emitted through the event pipeline instead of tightly coupling authentication logic to email delivery.
+
+---
+
+## Messaging reliability
+
+RabbitMQ carries domain events including OTP, patient registration, appointments, hospitals, and doctor-profile changes.
+
+### Transactional Outbox
+
+`auth-service`, `patient-service`, `hospital-service`, and `appointment-service` write outbound events to an `outbox_events` table in the same database transaction as the business change.
+
+Dispatchers later publish pending events to RabbitMQ.
+
+For horizontal scaling, outbox batches are claimed with PostgreSQL locking using `FOR UPDATE SKIP LOCKED`, preventing multiple service replicas from simultaneously dispatching the same pending row.
+
+### Stable event identity
+
+Published events carry a stable RabbitMQ `messageId` derived from the outbox event identity.
+
+### Retry and dead-letter queues
+
+Consumers use bounded retries with backoff. Messages that continue to fail are routed to durable DLQs instead of being silently acknowledged and lost.
+
+### Notification idempotency
+
+RabbitMQ provides at-least-once delivery, so duplicate delivery is possible. `notification-service` uses Redis `SETNX`-style idempotency keys based on the event ID before sending email.
+
+A successful notification retains the deduplication key for a TTL. If processing fails, the claim is released so RabbitMQ retry/DLQ behavior can continue.
+
+---
+
+## Database migrations
+
+Schema ownership is handled with Flyway for the database-owning services:
+
+```text
+auth-service
+patient-service
+appointment-service
+hospital-service
+```
+
+Hibernate uses:
+
+```properties
+spring.jpa.hibernate.ddl-auto=validate
+```
+
+That means Hibernate validates the mapped schema, while Flyway is responsible for creating and evolving it.
+
+CI also applies the migrations against fresh PostgreSQL databases and verifies that doctor credential columns exist only where they belong.
+
+---
+
+## AI / prescription processing
+
+`patient-service` can send prescription input to the Python AI/OCR service.
+
+Production behavior is fail-closed: OCR/dependency/processing failures return an error rather than silently substituting fake medical information.
+
+A mock fallback is available only when demo mode is explicitly enabled:
+
+```text
+AI_DEMO_MODE=true
+```
+
+Raw prescription/OCR text is not written to application logs.
+
+---
+
+## Technology stack
+
+| Area | Technology |
 | --- | --- |
-| Frontend | React 19, JavaScript, Vite 8, Tailwind CSS, React Router, Axios |
-| Services | Java 21, Spring Boot 4, Spring Web, Spring Data JPA |
-| Gateway and security | Spring API Gateway, JWT, CORS configuration |
-| Data and messaging | PostgreSQL 16, Redis 7, RabbitMQ 3 |
-| AI | Python service |
-| Local email | Mailpit; external SMTP can be configured |
-| Delivery | Jenkins, Docker, Docker Compose, Ansible |
-| Orchestration | Kubernetes, Minikube, Kustomize, HPA |
-| Secrets and observability | HashiCorp Vault, Elasticsearch, Logstash, Kibana |
+| Frontend | React, JavaScript, Vite, Tailwind CSS, React Router, Axios |
+| Backend | Java 21, Spring Boot 4, Spring Data JPA |
+| Gateway | Spring Cloud Gateway, JWT |
+| Database | PostgreSQL 16, Flyway |
+| Cache / coordination | Redis 7 |
+| Messaging | RabbitMQ 3, transactional outbox, DLQ |
+| QR | ZXing |
+| AI/OCR | Python service |
+| Local email | Mailpit |
+| Containers | Docker, Docker Compose |
+| Orchestration | Kubernetes, Kustomize, HPA, PDB, NetworkPolicy |
+| Delivery | GitHub Actions, Jenkins, Ansible |
+| Observability | Prometheus/Grafana, Elasticsearch, Logstash, Kibana |
+| Secrets | Kubernetes Secrets; Vault-supported delivery workflow |
+
+---
 
 ## Quick start with Docker Compose
 
 ### Prerequisites
 
 - Git
-- Docker Desktop with Docker Compose
-- `curl` for the health-check script
+- Docker Desktop / Docker Engine
+- Docker Compose
 
-Clone and start the complete local stack:
+Clone the repository:
 
 ```bash
-git clone git@github.com:Aditya01237/SwasthyaSetu.git
+git clone https://github.com/Aditya01237/SwasthyaSetu.git
 cd SwasthyaSetu
-cp .env.example .env
+```
+
+For the simplest local stack, Docker Compose defaults are enough:
+
+```bash
 docker compose up -d --build
 ```
 
-Wait for every application to become ready:
-
-```bash
-sh scripts/ci/health-check.sh
-```
-
-### Local URLs
+The default stack publishes only:
 
 | Application | URL |
 | --- | --- |
-| Patient application | `http://localhost:5173/patient/` |
-| Doctor application | `http://localhost:5174/doctor/` |
-| API Gateway health | `http://localhost:8080/actuator/health` |
-| Mailpit inbox | `http://localhost:18025` |
+| Patient app | `http://localhost:5173/patient/` |
+| Doctor app | `http://localhost:5174/doctor/` |
+| API Gateway | `http://localhost:8080` |
+| Gateway health | `http://localhost:8080/actuator/health` |
+
+Internal infrastructure and service ports are intentionally not published.
+
+### Debug ports
+
+When you explicitly need direct access to PostgreSQL, Redis, RabbitMQ management, Mailpit, AI, or the individual services, layer the development-port file:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.dev-ports.yml \
+  up -d --build
+```
+
+Common debug URLs then include:
+
+| Component | Default host endpoint |
+| --- | --- |
+| Mailpit UI | `http://localhost:18025` |
 | RabbitMQ management | `http://localhost:15672` |
+| Auth service | `http://localhost:8081` |
+| Patient service | `http://localhost:8082` |
+| Appointment service | `http://localhost:8083` |
+| Hospital service | `http://localhost:8084` |
+| Notification service | `http://localhost:8086` |
+| AI service | `http://localhost:8000` |
 
-Mailpit captures OTP and appointment emails locally, so Gmail credentials are
-not required for the default Compose workflow.
-
-Stop the stack without deleting persistent volumes:
+Stop containers while preserving volumes:
 
 ```bash
 docker compose down
 ```
 
+---
+
 ## Configuration
 
-Copy `.env.example` to `.env` and override only the values needed for your
-environment. Important groups include:
+The repository includes `.env.example` for optional overrides. Docker Compose already supplies development defaults for many values, so copy/edit the file only when you need explicit configuration.
 
-- PostgreSQL credentials and service JDBC URLs.
-- Redis and RabbitMQ ports and credentials.
-- public ports for the gateway, services, and frontends.
-- `JWT_SECRET` and allowed frontend origins.
-- `NOTIFICATION_MAIL_*` values when replacing Mailpit with external SMTP.
-- container registry, tag, ELK, and local CI stack settings.
+Important production-sensitive values include:
 
-The default Compose profile uses one PostgreSQL instance and the
-`swasthyasetudb` database. `docker-compose.service-dbs.yml` can be layered in to
-test service-specific logical databases such as `auth_db`, `patient_db`,
-`appointment_db`, and `hospital_db`.
-
-Do not commit `.env`, Vault tokens, SMTP passwords, or registry credentials.
-
-## Verification
-
-Validate Compose/Kubernetes configuration:
-
-```bash
-sh scripts/ci/validate-config.sh
+```text
+POSTGRES_USER / POSTGRES_PASSWORD
+RABBITMQ_DEFAULT_USER / RABBITMQ_DEFAULT_PASS
+JWT_SECRET
+INTERNAL_SERVICE_TOKEN
+APP_BOOTSTRAP_ADMIN_EMAIL
+APP_BOOTSTRAP_ADMIN_PASSWORD
+SMTP credentials
 ```
 
-Run the Java service checks:
+Never deploy using the development placeholder JWT/internal-service/database/messaging credentials.
+
+Do not commit real `.env` files, Vault tokens, SMTP passwords, TLS private keys, or registry credentials.
+
+### Service-owned databases locally
+
+To test the logical database-per-service model:
 
 ```bash
-sh scripts/ci/test-java-services.sh
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.service-dbs.yml \
+  up -d --build
 ```
 
-Build both React applications:
+This allows the services to use databases such as:
 
-```bash
-sh scripts/ci/build-frontends.sh
+```text
+auth_db
+patient_db
+appointment_db
+hospital_db
 ```
 
-Check a running Compose stack:
+---
 
-```bash
-sh scripts/ci/health-check.sh
+## Internal service calls
+
+Internal patient/appointment APIs are not intended to be public application APIs.
+
+They require an internal service credential:
+
+```text
+X-Internal-Service-Token
 ```
 
-## Core flows
+The token is supplied through Docker/Kubernetes configuration and attached by trusted service clients. Default Compose also keeps those services off host ports, providing a second layer of isolation.
 
-### OTP authentication
+Explicit connect/read timeouts are configured for internal HTTP calls so a failed downstream service cannot block request threads indefinitely.
 
-1. A patient or doctor requests an OTP through the gateway.
-2. `auth-service` stores an expiring verification record.
-3. An `auth.otp-requested` event is published to RabbitMQ.
-4. `notification-service` consumes the event and sends the message through
-   Mailpit or the configured SMTP provider.
-5. Successful verification allows the authenticated workflow to continue.
+---
 
-### Appointment booking
+## Kubernetes
 
-1. The patient selects a hospital, doctor, date, and time slot.
-2. `appointment-service` obtains a short-lived Redis lock for that slot.
-3. The appointment is persisted only when the slot remains available.
-4. An appointment event updates downstream read models and notifications.
-5. The patient receives booking details and a QR token.
+The base Kubernetes manifests live in:
 
-### QR-controlled medical access
+```text
+k8s/
+```
 
-1. The doctor scans the appointment QR code.
-2. `appointment-service` validates the appointment and doctor relationship.
-3. `patient-service` records a `QR_SCAN` audit event.
-4. Prescription upload and related medical-record operations are unlocked for
-   the validated appointment.
+A hardened production-oriented Kustomize overlay lives in:
 
-## Kubernetes and Ansible
+```text
+k8s-production/
+```
 
-Recommended local Minikube resources are at least 6 CPUs and 9 GB of memory.
+The production overlay adds controls including:
+
+- default-deny ingress NetworkPolicy;
+- explicit same-namespace communication;
+- NGINX ingress access to public entry points;
+- production HPA limits;
+- PodDisruptionBudgets;
+- HTTPS redirect/TLS configuration.
+
+RabbitMQ uses persistent storage so durable queues survive pod recreation.
+
+For a local Minikube deployment:
 
 ```bash
 minikube start --driver=docker --cpus=6 --memory=9000
@@ -232,41 +469,48 @@ minikube addons enable metrics-server
 sh scripts/ci/deploy-ansible-minikube-k8s.sh
 ```
 
-Verify the deployment:
+Useful verification commands:
 
 ```bash
-sh scripts/ci/health-check-k8s.sh
 kubectl get pods -n swasthya-setu
 kubectl top pods -n swasthya-setu
+kubectl kustomize k8s > /tmp/swasthya-base.yaml
+kubectl kustomize k8s-production > /tmp/swasthya-production.yaml
 ```
 
-The manifests under `k8s/` define application deployments, infrastructure,
-ingress, autoscaling, observability, and the `swasthya-setu` namespace. Ansible
-provides repeatable local Minikube and remote Compose deployment playbooks.
+Before using the production overlay, provide the required TLS Secret and replace all development Secret placeholders.
 
-## Vault and external SMTP
+---
 
-The default local stack uses Mailpit. For a Kubernetes demo with real SMTP,
-start the Vault overlay and store credentials outside the repository:
+## CI validation
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d vault
-export VAULT_ADDR=http://localhost:18200
-export VAULT_TOKEN=your-local-vault-token
-vault kv put secret/swasthya-setu/smtp \
-  SPRING_MAIL_USERNAME="your-email@example.com" \
-  SPRING_MAIL_PASSWORD="your-app-password" \
-  SPRING_MAIL_HOST="smtp.example.com" \
-  SPRING_MAIL_PORT="587"
+GitHub Actions runs on pull requests to `main` and pushes to `main` / `agent/**` branches.
+
+The workflow validates:
+
+- Maven tests for all six active Java services;
+- production builds for both React frontends;
+- fresh PostgreSQL schema migrations;
+- credential ownership (only auth DB may contain the doctor password column);
+- base Kubernetes rendering;
+- production Kubernetes rendering;
+- absence of the legacy backend from rendered Kubernetes resources.
+
+The workflow is defined at:
+
+```text
+.github/workflows/ci.yml
 ```
 
-The Jenkins stage `Apply SMTP Secrets From Vault` reads these values and updates
-the Kubernetes Secret consumed by `notification-service`. The included Vault
-profile is intended for local demonstrations, not production operation.
+Additional repository scripts under `scripts/ci/` provide configuration validation, builds, health checks, and deployment helpers.
+
+---
 
 ## Observability
 
-Start the ELK overlay with the application stack:
+The project includes Prometheus/Grafana and ELK support for metrics and centralized logs.
+
+The Docker ELK overlay can be started with:
 
 ```bash
 docker compose \
@@ -275,69 +519,85 @@ docker compose \
   up -d
 ```
 
-| Tool | Default URL/port | Purpose |
+Common local observability endpoints when their overlay ports are published include:
+
+| Tool | Default endpoint | Purpose |
 | --- | --- | --- |
-| Elasticsearch | `http://localhost:9200` | Stores indexed logs |
-| Kibana | `http://localhost:5601` | Searches and visualizes logs |
-| Logstash | GELF `12201`, API `9600` | Receives and transforms service logs |
+| Elasticsearch | `http://localhost:9200` | Indexed application logs |
+| Kibana | `http://localhost:5601` | Log search and visualization |
+| Logstash | GELF `12201`, API `9600` | Log ingestion/transformation |
 
-For Kubernetes resource metrics, use `kubectl top pods -n swasthya-setu` after
-enabling `metrics-server`.
+For Kubernetes resource metrics:
 
-## Jenkins pipeline
+```bash
+kubectl top pods -n swasthya-setu
+```
 
-The root `Jenkinsfile` contains these primary stages:
-
-1. Checkout and configuration validation.
-2. Parallel Java service tests.
-3. Patient and doctor frontend builds.
-4. Python AI-service validation.
-5. Vault preparation.
-6. Docker image build and registry publication.
-7. Ansible-driven Minikube deployment.
-8. SMTP Secret injection from Vault.
-
-Jenkins requires appropriately scoped registry and Vault credentials. Use the
-credential IDs documented in the pipeline parameters instead of placing secrets
-in source-controlled files.
+---
 
 ## Repository layout
 
 ```text
+.github/workflows/       GitHub Actions CI
 services/
-  api-gateway/          Public API routing
-  auth-service/         OTP and authentication
-  patient-service/      Patients, records, QR audit
-  appointment-service/  Booking, slots, Redis locks, QR validation
-  hospital-service/     Hospitals and doctors
-  notification-service/ RabbitMQ-driven email delivery
-  backend/              Legacy transition service
-  ai-service/           Python AI API
-swasthya-frontend/      Patient React application
-doctor-frontend/        Doctor React application
-docker/                 PostgreSQL and Logstash support files
-k8s/                    Kubernetes and Kustomize manifests
-ansible/                Deployment inventories and playbooks
-scripts/ci/             Validation, build, deploy, and health scripts
-scripts/local/          Demo seeding and port-forward helpers
-docs/                   Reports, architecture notes, and runbooks
-Jenkinsfile             CI/CD pipeline
-docker-compose.yml      Complete local application stack
+  api-gateway/           JWT-aware public API gateway
+  auth-service/          OTP, credentials, invitations, admin auth
+  patient-service/       Patient records, prescriptions, QR audit
+  appointment-service/   Booking, slots, Redis locking, QR lifecycle
+  hospital-service/      Hospitals and doctor profiles
+  notification-service/  RabbitMQ email consumers and idempotency
+  ai-service/            Python OCR/prescription API
+  backend/               Historical legacy source; inactive runtime
+swasthya-frontend/       Patient React application
+doctor-frontend/         Doctor React application
+docker/                  PostgreSQL and logging support files
+k8s/                     Base Kubernetes/Kustomize resources
+k8s-production/          Hardened production Kustomize overlay
+ansible/                 Deployment inventories and playbooks
+scripts/ci/              Build, validation, deploy and health scripts
+scripts/local/           Local/demo helpers
+docs/                    Architecture notes and runbooks
+Jenkinsfile              Jenkins delivery pipeline
+docker-compose.yml       Default private-service local stack
+docker-compose.dev-ports.yml  Explicit direct-port debugging overlay
 ```
 
-## Demo data
+---
 
-After a fresh Kubernetes deployment, seed the demonstration databases with:
+## Key engineering decisions
 
-```bash
-sh scripts/local/seed-demo-database.sh
+### Why microservices?
+
+Authentication, patient records, hospital management, appointment traffic, and notification workloads have different responsibilities and scaling profiles. Separating them gives each service a clear ownership boundary and allows high-traffic components such as appointments or the gateway to scale without scaling unrelated business logic.
+
+### Why Redis for booking locks?
+
+Two patients can select the same doctor/time slot almost simultaneously. A short-lived distributed Redis lock protects the critical section before the durable database write, reducing race conditions across multiple appointment-service instances.
+
+### Why RabbitMQ + Outbox?
+
+Directly saving business data and then publishing a RabbitMQ message creates a dual-write problem: the database write can succeed while event publication fails. The transactional outbox stores the business change and event in one database transaction, then publishes asynchronously.
+
+### Why DLQ and idempotency?
+
+RabbitMQ is intentionally at-least-once. Retry/DLQ prevents silent message loss, while stable event IDs plus Redis idempotency prevent repeated delivery from causing duplicate notification side effects.
+
+### Why Flyway + `ddl-auto=validate`?
+
+Production schema changes should be explicit and version-controlled. Flyway evolves the schema; Hibernate validates entity/schema compatibility instead of mutating production tables automatically.
+
+### Why keep identity out of request parameters?
+
+Authorization decisions must come from authenticated server-side identity, not user-editable request data. The gateway derives identity from the JWT and downstream services authorize against that trusted context.
+
+---
+
+## Further documentation
+
+Additional deployment notes, architecture material, and troubleshooting guides are available under:
+
+```text
+docs/
+k8s/README.md
+ansible/README.md
 ```
-
-For local access to Kubernetes services, run:
-
-```bash
-sh scripts/local/port-forward-demo.sh
-```
-
-Detailed deployment notes, rubric mapping, and troubleshooting material remain
-available under `docs/`, `k8s/README.md`, and `ansible/README.md`.
