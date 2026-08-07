@@ -2,6 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: api-gateway-hpa
+  namespace: swasthya-setu
 spec:
   minReplicas: 2
   maxReplicas: 6
@@ -10,6 +11,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: auth-service-hpa
+  namespace: swasthya-setu
 spec:
   minReplicas: 2
   maxReplicas: 6
@@ -18,6 +20,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: appointment-service-hpa
+  namespace: swasthya-setu
 spec:
   minReplicas: 2
   maxReplicas: 6
@@ -26,6 +29,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: patient-service-hpa
+  namespace: swasthya-setu
 spec:
   minReplicas: 2
   maxReplicas: 6
