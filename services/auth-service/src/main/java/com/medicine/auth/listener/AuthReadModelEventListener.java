@@ -53,9 +53,7 @@ public class AuthReadModelEventListener {
             try {
                 PatientRegisteredEvent event = objectMapper.readValue(payload, PatientRegisteredEvent.class);
                 Patient patient = findPatient(event);
-                if (event.id() != null) {
-                    patient.setId(event.id());
-                }
+                if (event.id() != null) patient.setId(event.id());
                 patient.setUhid(event.uhid());
                 patient.setName(event.name());
                 patient.setEmail(event.email());
@@ -63,17 +61,15 @@ public class AuthReadModelEventListener {
                 patient.setAge(event.age() != null ? event.age() : 0);
                 patient.setGender(event.gender());
                 patient.setCreatedAt(parseDateTime(event.createdAt()));
-                if (patient.getId() != null) {
-                    entityManager.merge(patient);
-                } else {
-                    patientRepository.save(patient);
-                }
+                if (patient.getId() != null) entityManager.merge(patient);
+                else patientRepository.save(patient);
                 log.info("Synced patient {} (uhid={}) into auth read model", event.name(), event.uhid());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync patient.registered into auth read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync patient.registered; message will be retried", ex);
+                throw new RuntimeException("patient.registered auth read-model sync failed", ex);
             }
-            return null;
         });
     }
 
@@ -86,11 +82,12 @@ public class AuthReadModelEventListener {
                 applyHospital(hospital, event);
                 hospitalRepository.save(hospital);
                 log.info("Synced hospital {} into auth read model", event.id());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync hospital.upserted into auth read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync hospital.upserted; message will be retried", ex);
+                throw new RuntimeException("hospital.upserted auth read-model sync failed", ex);
             }
-            return null;
         });
     }
 
@@ -100,9 +97,6 @@ public class AuthReadModelEventListener {
             try {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
                 Optional<Doctor> existing = findExistingDoctor(event);
-
-                // Credentials are owned by auth-service. A profile event must never create
-                // a credential row because it intentionally contains no password.
                 if (existing.isEmpty()) {
                     log.info("Skipping doctor profile sync for unknown auth account email={}", event.email());
                     return null;
@@ -119,11 +113,12 @@ public class AuthReadModelEventListener {
                 }
                 doctorRepository.save(doctor);
                 log.info("Synced doctor profile {} (email={}) into auth account", event.name(), event.email());
+                return null;
             } catch (Exception ex) {
-                log.error("Failed to sync doctor.registered into auth read model", ex);
                 status.setRollbackOnly();
+                log.error("Failed to sync doctor.registered; message will be retried", ex);
+                throw new RuntimeException("doctor.registered auth read-model sync failed", ex);
             }
-            return null;
         });
     }
 
@@ -138,9 +133,7 @@ public class AuthReadModelEventListener {
     private Optional<Doctor> findExistingDoctor(DoctorRegisteredEvent event) {
         if (event.id() != null) {
             Optional<Doctor> byId = doctorRepository.findById(event.id());
-            if (byId.isPresent()) {
-                return byId;
-            }
+            if (byId.isPresent()) return byId;
         }
         return doctorRepository.findByEmail(event.email());
     }
