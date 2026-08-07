@@ -73,3 +73,64 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  migration-smoke:
+    name: Fresh PostgreSQL migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Create service databases
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for db in auth_db patient_db appointment_db hospital_db; do
+            psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db};"
+          done
+
+      - name: Apply Flyway SQL in version order
+        env:
+          PGPASSWORD: postgres
+        run: |
+          apply_migrations() {
+            db="$1"
+            directory="$2"
+            while IFS= read -r file; do
+              echo "Applying ${file} to ${db}"
+              psql -h localhost -U postgres -d "${db}" -v ON_ERROR_STOP=1 -f "${file}"
+            done < <(find "${directory}" -maxdepth 1 -type f -name 'V*.sql' | sort -V)
+          }
+
+          apply_migrations auth_db services/auth-service/src/main/resources/db/migration
+          apply_migrations patient_db services/patient-service/src/main/resources/db/migration
+          apply_migrations appointment_db services/appointment-service/src/main/resources/db/migration
+          apply_migrations hospital_db services/hospital-service/src/main/resources/db/migration
+
+      - name: Verify credential ownership
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for db in patient_db appointment_db hospital_db; do
+            count=$(psql -h localhost -U postgres -d "${db}" -tAc "SELECT count(*) FROM information_schema.columns WHERE table_name='doctors' AND column_name='password';")
+            test "${count}" = "0"
+          done
+          auth_count=$(psql -h localhost -U postgres -d auth_db -tAc "SELECT count(*) FROM information_schema.columns WHERE table_name='doctors' AND column_name='password';")
+          test "${auth_count}" = "1"
