@@ -46,7 +46,6 @@ public class HospitalReadModelEventListener {
                 doctor.setExperience(event.experience());
                 doctor.setFee(event.fee());
                 doctor.setEmail(event.email());
-                doctor.setPassword(event.password());
                 if (event.hospitalId() != null) {
                     hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
                 }
