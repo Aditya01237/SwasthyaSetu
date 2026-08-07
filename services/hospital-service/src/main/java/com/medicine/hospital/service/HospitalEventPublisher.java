@@ -69,7 +69,6 @@ public class HospitalEventPublisher {
                 doctor.getExperience(),
                 doctor.getFee(),
                 doctor.getEmail(),
-                doctor.getPassword(),
                 doctor.getHospital() != null ? doctor.getHospital().getId() : null
         );
 
@@ -107,7 +106,6 @@ public class HospitalEventPublisher {
             int experience,
             int fee,
             String email,
-            String password,
             String hospitalId
     ) {
     }
