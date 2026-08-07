@@ -1,11 +1,13 @@
 package com.medicine.auth.listener;
 
 import com.medicine.auth.entity.Doctor;
+import com.medicine.auth.entity.DoctorInvitation;
 import com.medicine.auth.entity.Hospital;
 import com.medicine.auth.entity.Patient;
 import com.medicine.auth.event.DoctorRegisteredEvent;
 import com.medicine.auth.event.HospitalUpsertedEvent;
 import com.medicine.auth.event.PatientRegisteredEvent;
+import com.medicine.auth.repository.DoctorInvitationRepository;
 import com.medicine.auth.repository.DoctorRepository;
 import com.medicine.auth.repository.HospitalRepository;
 import com.medicine.auth.repository.PatientRepository;
@@ -30,6 +32,7 @@ public class AuthReadModelEventListener {
     private final PatientRepository patientRepository;
     private final HospitalRepository hospitalRepository;
     private final DoctorRepository doctorRepository;
+    private final DoctorInvitationRepository doctorInvitationRepository;
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
 
@@ -37,12 +40,14 @@ public class AuthReadModelEventListener {
                                       PatientRepository patientRepository,
                                       HospitalRepository hospitalRepository,
                                       DoctorRepository doctorRepository,
+                                      DoctorInvitationRepository doctorInvitationRepository,
                                       EntityManager entityManager,
                                       TransactionTemplate transactionTemplate) {
         this.objectMapper = objectMapper;
         this.patientRepository = patientRepository;
         this.hospitalRepository = hospitalRepository;
         this.doctorRepository = doctorRepository;
+        this.doctorInvitationRepository = doctorInvitationRepository;
         this.entityManager = entityManager;
         this.transactionTemplate = transactionTemplate;
     }
@@ -96,9 +101,12 @@ public class AuthReadModelEventListener {
         transactionTemplate.execute(status -> {
             try {
                 DoctorRegisteredEvent event = objectMapper.readValue(payload, DoctorRegisteredEvent.class);
+                validateDoctorProfileEvent(event);
+
                 Optional<Doctor> existing = findExistingDoctor(event);
                 if (existing.isEmpty()) {
-                    log.info("Skipping doctor profile sync for unknown auth account email={}", event.email());
+                    upsertInvitation(event);
+                    log.info("Created/updated doctor invitation for profile id={} email={}", event.id(), event.email());
                     return null;
                 }
 
@@ -108,9 +116,7 @@ public class AuthReadModelEventListener {
                 doctor.setExperience(event.experience());
                 doctor.setFee(event.fee());
                 doctor.setEmail(event.email());
-                if (event.hospitalId() != null) {
-                    hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
-                }
+                hospitalRepository.findById(event.hospitalId()).ifPresent(doctor::setHospital);
                 doctorRepository.save(doctor);
                 log.info("Synced doctor profile {} (email={}) into auth account", event.name(), event.email());
                 return null;
@@ -120,6 +126,29 @@ public class AuthReadModelEventListener {
                 throw new RuntimeException("doctor.registered auth read-model sync failed", ex);
             }
         });
+    }
+
+    private void validateDoctorProfileEvent(DoctorRegisteredEvent event) {
+        if (event.id() == null || event.email() == null || event.email().isBlank()
+                || event.hospitalId() == null || event.hospitalId().isBlank()) {
+            throw new IllegalArgumentException("doctor.registered must include id, email and hospitalId");
+        }
+    }
+
+    private void upsertInvitation(DoctorRegisteredEvent event) {
+        DoctorInvitation invitation = doctorInvitationRepository.findById(event.id())
+                .orElseGet(() -> doctorInvitationRepository.findByEmail(event.email())
+                        .orElseGet(DoctorInvitation::new));
+        invitation.setDoctorId(event.id());
+        invitation.setEmail(event.email().trim().toLowerCase());
+        invitation.setHospitalId(event.hospitalId());
+        invitation.setName(event.name());
+        invitation.setSpecialization(event.specialization());
+        invitation.setExperience(event.experience());
+        invitation.setFee(event.fee());
+        invitation.setStatus("PENDING");
+        invitation.setAcceptedAt(null);
+        doctorInvitationRepository.save(invitation);
     }
 
     private Patient findPatient(PatientRegisteredEvent event) {
