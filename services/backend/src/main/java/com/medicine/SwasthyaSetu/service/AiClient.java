@@ -2,6 +2,7 @@ package com.medicine.SwasthyaSetu.service;
 
 import com.medicine.SwasthyaSetu.dto.PrescriptionResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,31 +13,41 @@ import java.util.Map;
 @Component
 public class AiClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String aiServiceUrl;
 
-    public AiClient(@Value("${ai.service.url:http://localhost:8000}") String aiServiceUrl) {
+    public AiClient(
+            @Value("${ai.service.url:http://localhost:8000}") String aiServiceUrl,
+            @Value("${AI_CONNECT_TIMEOUT_MS:3000}") int connectTimeoutMs,
+            @Value("${AI_READ_TIMEOUT_MS:15000}") int readTimeoutMs) {
         this.aiServiceUrl = aiServiceUrl;
+        this.restTemplate = createRestTemplate(connectTimeoutMs, readTimeoutMs);
     }
 
     public PrescriptionResponse process(MultipartFile file) {
-
         try {
-            // convert image → base64
             String base64 = Base64.getEncoder().encodeToString(file.getBytes());
-
-            String url = aiServiceUrl + "/process";
-
             Map<String, String> request = Map.of("image", base64);
 
-            return restTemplate.postForObject(
-                    url,
+            PrescriptionResponse response = restTemplate.postForObject(
+                    aiServiceUrl + "/process",
                     request,
                     PrescriptionResponse.class
             );
 
+            if (response == null) {
+                throw new RuntimeException("AI Service returned empty response");
+            }
+            return response;
         } catch (Exception e) {
             throw new RuntimeException("AI Service failed", e);
         }
+    }
+
+    private RestTemplate createRestTemplate(int connectTimeoutMs, int readTimeoutMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectTimeoutMs);
+        factory.setReadTimeout(readTimeoutMs);
+        return new RestTemplate(factory);
     }
 }
