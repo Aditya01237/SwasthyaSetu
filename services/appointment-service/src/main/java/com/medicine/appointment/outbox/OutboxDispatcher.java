@@ -25,13 +25,16 @@ public class OutboxDispatcher {
     @Scheduled(fixedDelayString = "${app.outbox.poll-ms:1000}")
     @Transactional
     public void publishPending() {
-        for (OutboxEvent event : repository.findTop100ByPublishedAtIsNullOrderByCreatedAtAsc()) {
+        for (OutboxEvent event : repository.lockNextBatch()) {
             try {
-                rabbitTemplate.convertAndSend(event.getExchangeName(), event.getRoutingKey(), event.getPayload());
+                rabbitTemplate.convertAndSend(event.getExchangeName(), event.getRoutingKey(), event.getPayload(), message -> {
+                    message.getMessageProperties().setMessageId(event.getEventId());
+                    return message;
+                });
                 event.markPublished();
             } catch (Exception ex) {
                 event.markFailed(ex);
-                log.warn("Outbox publish failed for event {} routingKey={}", event.getId(), event.getRoutingKey(), ex);
+                log.warn("Outbox publish failed for event {} routingKey={}", event.getEventId(), event.getRoutingKey(), ex);
             }
             repository.save(event);
         }
