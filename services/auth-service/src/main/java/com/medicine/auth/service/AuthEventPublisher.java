@@ -54,7 +54,6 @@ public class AuthEventPublisher {
                 doctor.getExperience(),
                 doctor.getFee(),
                 doctor.getEmail(),
-                doctor.getPassword(),
                 doctor.getHospital() != null ? doctor.getHospital().getId() : null
         );
 
@@ -79,7 +78,6 @@ public class AuthEventPublisher {
             int experience,
             int fee,
             String email,
-            String password,
             String hospitalId
     ) {
     }
