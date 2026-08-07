@@ -1,6 +1,5 @@
 package com.medicine.appointment.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,11 +28,6 @@ public class Doctor {
 
     @Column(nullable = false, unique = true)
     private String email;
-
-    // Legacy compatibility only. Read models no longer receive or expose credentials.
-    @JsonIgnore
-    @Column(nullable = true)
-    private String password;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hospital_id")
