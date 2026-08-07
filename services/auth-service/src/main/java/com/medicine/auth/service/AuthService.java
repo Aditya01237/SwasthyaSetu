@@ -8,10 +8,12 @@ import com.medicine.auth.dto.SendOtpResponse;
 import com.medicine.auth.dto.VerifyOtpRequest;
 import com.medicine.auth.dto.VerifyOtpResponse;
 import com.medicine.auth.entity.Doctor;
+import com.medicine.auth.entity.DoctorInvitation;
 import com.medicine.auth.entity.Hospital;
 import com.medicine.auth.entity.OtpVerification;
 import com.medicine.auth.entity.Patient;
 import com.medicine.auth.exception.OtpValidationException;
+import com.medicine.auth.repository.DoctorInvitationRepository;
 import com.medicine.auth.repository.DoctorRepository;
 import com.medicine.auth.repository.HospitalRepository;
 import com.medicine.auth.repository.OtpVerificationRepository;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Service
 public class AuthService {
@@ -32,6 +35,7 @@ public class AuthService {
 
     private final PatientRepository patientRepository;
     private final DoctorRepository doctorRepository;
+    private final DoctorInvitationRepository doctorInvitationRepository;
     private final HospitalRepository hospitalRepository;
     private final OtpVerificationRepository otpRepository;
     private final AuthEventPublisher authEventPublisher;
@@ -42,6 +46,7 @@ public class AuthService {
 
     public AuthService(PatientRepository patientRepository,
                        DoctorRepository doctorRepository,
+                       DoctorInvitationRepository doctorInvitationRepository,
                        HospitalRepository hospitalRepository,
                        OtpVerificationRepository otpRepository,
                        AuthEventPublisher authEventPublisher,
@@ -51,6 +56,7 @@ public class AuthService {
                        @Value("${app.otp.resend-cooldown-seconds:60}") long resendCooldownSeconds) {
         this.patientRepository = patientRepository;
         this.doctorRepository = doctorRepository;
+        this.doctorInvitationRepository = doctorInvitationRepository;
         this.hospitalRepository = hospitalRepository;
         this.otpRepository = otpRepository;
         this.authEventPublisher = authEventPublisher;
@@ -112,7 +118,8 @@ public class AuthService {
 
     @Transactional
     public DoctorLoginResponse login(DoctorLoginRequest request) {
-        Doctor doctor = doctorRepository.findByEmail(request.getEmail())
+        String email = normalizeEmail(request.getEmail());
+        Doctor doctor = doctorRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Doctor not found"));
 
         String storedPassword = doctor.getPassword();
@@ -126,17 +133,26 @@ public class AuthService {
 
         if (!isBcryptHash(storedPassword)) {
             doctor.setPassword(passwordEncoder.encode(request.getPassword()));
-            doctorRepository.save(doctor);
         }
 
+        // Compatibility for accounts created before profileId was introduced.
+        // The hospital profile event will replace this fallback with the real profile ID.
+        if (doctor.getProfileId() == null) {
+            doctor.setProfileId(doctor.getId());
+        }
+        doctorRepository.save(doctor);
+
         DoctorLoginResponse response = new DoctorLoginResponse();
-        response.setToken(jwtUtil.generateToken(String.valueOf(doctor.getId()), "DOCTOR"));
+        response.setToken(jwtUtil.generateToken(String.valueOf(doctor.getProfileId()), "DOCTOR"));
         response.setDoctor(doctor);
         return response;
     }
 
     @Transactional
-    public SendOtpResponse sendDoctorOtp(String email) {
+    public SendOtpResponse sendDoctorOtp(String emailValue) {
+        String email = normalizeEmail(emailValue);
+        requirePendingInvitation(email);
+
         OtpVerification otp = otpRepository.findByEmail(email)
                 .orElse(new OtpVerification());
         enforceResendCooldown(otp);
@@ -154,13 +170,15 @@ public class AuthService {
         authEventPublisher.publishOtpRequested(email, otp.getOtp());
 
         SendOtpResponse response = new SendOtpResponse();
-        response.setMessage("OTP sent to doctor email");
+        response.setMessage("OTP sent to invited doctor email");
         response.setMaskedEmail(maskEmail(email));
         return response;
     }
 
     @Transactional(dontRollbackOn = OtpValidationException.class)
-    public boolean verifyDoctorOtp(String email, String otpInput) {
+    public boolean verifyDoctorOtp(String emailValue, String otpInput) {
+        String email = normalizeEmail(emailValue);
+        requirePendingInvitation(email);
         OtpVerification otp = otpRepository.findByEmail(email)
                 .orElseThrow(() -> new OtpValidationException("OTP not found"));
         validateOtp(otp, otpInput);
@@ -171,33 +189,50 @@ public class AuthService {
 
     @Transactional
     public String registerDoctor(DoctorRegisterRequest request) {
-        if (doctorRepository.findByEmail(request.getEmail()).isPresent()) {
+        String email = normalizeEmail(request.getEmail());
+        if (doctorRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Doctor already exists");
         }
+        if (request.getPassword() == null || request.getPassword().length() < 8) {
+            throw new RuntimeException("Password must be at least 8 characters");
+        }
 
-        OtpVerification otp = otpRepository.findByEmail(request.getEmail())
+        DoctorInvitation invitation = requirePendingInvitation(email);
+        OtpVerification otp = otpRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Please verify email first"));
-
         if (!otp.isVerified()) {
             throw new RuntimeException("Email not verified");
         }
 
-        Hospital hospital = hospitalRepository.findById(request.getHospitalId())
-                .orElseThrow(() -> new RuntimeException("Hospital not found"));
+        Hospital hospital = hospitalRepository.findById(invitation.getHospitalId())
+                .orElseThrow(() -> new RuntimeException("Hospital profile is not synced yet"));
 
         Doctor doctor = new Doctor();
-        doctor.setName(request.getName());
-        doctor.setSpecialization(request.getSpecialization());
-        doctor.setExperience(request.getExperience());
-        doctor.setFee(request.getFee());
-        doctor.setEmail(request.getEmail());
+        doctor.setProfileId(invitation.getDoctorId());
+        doctor.setName(invitation.getName());
+        doctor.setSpecialization(invitation.getSpecialization());
+        doctor.setExperience(invitation.getExperience());
+        doctor.setFee(invitation.getFee());
+        doctor.setEmail(email);
         doctor.setPassword(passwordEncoder.encode(request.getPassword()));
         doctor.setHospital(hospital);
         Doctor saved = doctorRepository.save(doctor);
         authEventPublisher.publishDoctorRegistered(saved);
 
+        invitation.setStatus("ACCEPTED");
+        invitation.setAcceptedAt(LocalDateTime.now());
+        doctorInvitationRepository.save(invitation);
         otpRepository.delete(otp);
-        return "Doctor registered successfully";
+        return "Doctor account activated successfully";
+    }
+
+    private DoctorInvitation requirePendingInvitation(String email) {
+        DoctorInvitation invitation = doctorInvitationRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("No hospital invitation found for this email"));
+        if (!"PENDING".equals(invitation.getStatus())) {
+            throw new RuntimeException("Doctor invitation is no longer active");
+        }
+        return invitation;
     }
 
     private void validateOtp(OtpVerification otp, String otpInput) {
@@ -245,6 +280,13 @@ public class AuthService {
 
     private String generateOtp() {
         return String.valueOf(100000 + SECURE_RANDOM.nextInt(900000));
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email is required");
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private String maskEmail(String email) {
