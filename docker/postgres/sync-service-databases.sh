@@ -78,6 +78,37 @@ copy_table() {
     "$SOURCE_DB" | psql_db "$target_db" >/dev/null
 }
 
+copy_doctor_profiles() {
+  target_db="$1"
+  tmp_file="/tmp/swasthya-doctor-profiles-$$.csv"
+
+  if ! table_exists "$SOURCE_DB" doctors; then
+    echo "Skipping doctors for $target_db: source table not found"
+    return
+  fi
+
+  if ! table_exists "$target_db" doctors; then
+    echo "Skipping doctors for $target_db: target table not found yet"
+    return
+  fi
+
+  echo "Copying doctor profile fields only -> $target_db (credentials stay in auth DB)"
+  psql_db "$SOURCE_DB" -c "\copy (SELECT id, name, specialization, experience, fee, email, hospital_id FROM public.doctors) TO '$tmp_file' WITH (FORMAT csv)"
+  psql_db "$target_db" -c "\copy public.doctors (id, name, specialization, experience, fee, email, hospital_id) FROM '$tmp_file' WITH (FORMAT csv)"
+  rm -f "$tmp_file"
+}
+
+copy_table_for_target() {
+  target_db="$1"
+  table="$2"
+
+  if [ "$table" = "doctors" ] && [ "$target_db" != "$AUTH_DB" ]; then
+    copy_doctor_profiles "$target_db"
+  else
+    copy_table "$target_db" "$table"
+  fi
+}
+
 reset_sequences() {
   db="$1"
   psql_db "$db" <<'SQL'
@@ -123,7 +154,7 @@ sync_database() {
   truncate_target_tables "$target_db" "$@"
 
   for table in "$@"; do
-    copy_table "$target_db" "$table"
+    copy_table_for_target "$target_db" "$table"
   done
 
   reset_sequences "$target_db"
