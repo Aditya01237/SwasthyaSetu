@@ -33,8 +33,11 @@ public class AuthEventPublisher {
     }
 
     public void publishDoctorRegistered(Doctor doctor) {
+        if (doctor.getProfileId() == null) {
+            throw new IllegalStateException("Doctor profileId is required before publishing doctor.registered");
+        }
         DoctorRegisteredEvent event = new DoctorRegisteredEvent(
-                doctor.getId(), doctor.getName(), doctor.getSpecialization(), doctor.getExperience(), doctor.getFee(),
+                doctor.getProfileId(), doctor.getName(), doctor.getSpecialization(), doctor.getExperience(), doctor.getFee(),
                 doctor.getEmail(), doctor.getHospital() != null ? doctor.getHospital().getId() : null
         );
         enqueue(doctorRegisteredRoutingKey, event, "doctor.registered");
