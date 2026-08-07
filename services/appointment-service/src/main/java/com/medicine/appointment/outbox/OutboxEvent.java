@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "outbox_events")
@@ -16,6 +17,9 @@ public class OutboxEvent {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true, length = 64)
+    private String eventId;
 
     @Column(nullable = false)
     private String exchangeName;
@@ -40,6 +44,7 @@ public class OutboxEvent {
     protected OutboxEvent() {}
 
     public OutboxEvent(String exchangeName, String routingKey, String payload) {
+        this.eventId = UUID.randomUUID().toString();
         this.exchangeName = exchangeName;
         this.routingKey = routingKey;
         this.payload = payload;
@@ -48,6 +53,7 @@ public class OutboxEvent {
     }
 
     public Long getId() { return id; }
+    public String getEventId() { return eventId; }
     public String getExchangeName() { return exchangeName; }
     public String getRoutingKey() { return routingKey; }
     public String getPayload() { return payload; }
