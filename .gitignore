@@ -1,4 +1,50 @@
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# IDE metadata
+.idea/
+.vscode/
+*.iml
+
+# Environment variables and local secrets
 .env
-.pycache/
-.txt
+.env.*
+!.env.example
+!.env.ci
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Java / Maven
+target/
+*.class
+
+# Node.js / Vite
+node_modules/
+dist/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Tool caches, logs, and temporary files
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log
+*.tmp
+*.swp
 .tmp/
